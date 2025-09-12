@@ -3,37 +3,52 @@ import 'dotenv/config';
 import { readFileSync, writeFileSync } from "fs";
 // Get token
 
-function get_and_save_auth_token(token) {
-  let tokenresponse = axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
-    auth: { username: process.env.REDDIT_CLIENTID, password: process.env.REDDIT_SECRET },
-    headers: { "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", "Content-Type": "application/x-www-form-urlencoded" }
+main();
+
+function main() {
+  let tokenholder = { token: "" };
+  check_auth_token_expired(tokenholder);
+
+  let subreddit = 'datascience'
+  let request_instance = axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
+    headers: {
+      "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
+    }
+  })
+  request_instance.then((response) => {
+    console.log(response.data)
   })
 
-  tokenresponse.then(function (response) {
-    const expiration_date = Math.floor(Date.now() / 1000) + response.data.expires_in;
-    token = response.data.access_token;
-    writeFileSync('token.txt', expiration_date + ":::" + token);
-  });
 }
 
-function check_auth_token_expired(token) {
+async function check_auth_token_expired(tokenholder) {
   const tokenfile = readFileSync('token.txt', 'utf-8').split(':::')
   if (Number(tokenfile[0]) < ((Date.now() / 1000) - 60)) {
-    get_and_save_auth_token(token)
+    await get_and_save_auth_token(tokenholder)
     console.log("Token Expired")
   }
   else {
     console.log("Token Still Good")
-    token = tokenfile[1];
+    tokenholder.token = tokenfile[1];
   }
+
 }
 
-function main() {
-  let token;
-  check_auth_token_expired(token);
+async function get_and_save_auth_token(tokenholder) {
+  let tokenresponse = axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
+    auth: { username: process.env.REDDIT_CLIENTID, password: process.env.REDDIT_SECRET },
+    headers: { "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", "Content-Type": "application/x-www-form-urlencoded" }
+  })
+  tokenresponse.then(function (response) {
+    const expiration_date = Math.floor(Date.now() / 1000) + response.data.expires_in;
+    tokenholder.token = response.data.access_token;
+    writeFileSync('token.txt', expiration_date + ":::" + tokenholder.token);
+  });
+  await Promise.resolve(tokenresponse);
 }
 
-main();
+// https://oauth.reddit.com/r/${subreddit}/new
+
 // read token.txt.
 // if the expiration date is later than now- we will request a new token.
 //  When we request the new token, we will..
