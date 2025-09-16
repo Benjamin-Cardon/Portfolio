@@ -10,27 +10,17 @@ function main() {
   check_auth_token_expired(tokenholder);
 
   let subreddit = 'datascience';
+  subreddit = "DeweyGetOutOfThere"
   const headers = {
     "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
   }
-  let request_instance = axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
-    headers
+
+  let data = [];
+  get_posts_until(headers, subreddit, data, 500).then(() => {
+    console.log(data)
+    console.log(data.length)
   })
-  request_instance.then((response) => {
-    const children = response.data.data.children
-    let sum = 0;
-    for (let i = 0; i < children.length; i++) {
-      sum += children[i].data.num_comments;
-    }
-    console.log("IN The 25 newest articles- there are this many comments: " + sum)
-    // let post_ID = response.data.data.children[0].data.id;
-    // let commentTreeRequest = axios.get(`https://oauth.reddit.com/r/${subreddit}/comments/${post_ID}`, { headers })
-    // commentTreeRequest.then((response) => {
-    //   for (let i = 0; i < response.data.length; i++) {
-    //     console.log(response.data[i]);
-    //   }
-    // })
-  })
+
 
 }
 
@@ -59,9 +49,48 @@ async function get_and_save_auth_token(tokenholder) {
   });
   await Promise.resolve(tokenresponse);
 }
+// type. Current options
 //Count- How many posts we will request until
-// Timeprev- unixtime
-async function get_posts_until() { }
+// Timeprev- unixtime period
+async function get_posts_until(headers, subreddit, data, count, before) {
+  const limit = 100;
+  // TODO: Add error checking. Since this will be production, consider typescript? For now- that's too much.
+  if (data.length == count) {
+    console.log(data.length)
+    return;
+  }
+  const params = {
+    limit,
+  }
+  if (before != undefined) {
+    params.before = before;
+  }
+  let request_instance = axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
+    headers, params
+  })
+  await request_instance.then((response) => {
+    let children = response.data.data.children;
+    data.push(...children)
+    // oh my god it hurts it hurts so fucking bad.
+    // we'll have to measure the efficiency of this code.
+    if (children.length < limit || response.data.data.after === null) {
+      return;
+    }
+    if (children.length >= count) {
+      return;
+    } else {
+      before = children[children.length - 1].data.id;
+      setTimeout(() => {
+        console.log("Sleep one second");
+      }, 1000);
+      get_posts_until(headers, subreddit, data, count, before)
+    }
+  })
+
+}
+
+
+
 // https://oauth.reddit.com/r/${subreddit}/new
 
 // read token.txt.
@@ -77,3 +106,18 @@ async function get_posts_until() { }
 // >>> downs = ups - submission.score
 // >>> ups,downs
 // 2 1
+
+// let request_instance = axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
+//   headers
+// })
+// request_instance.then((response) => {
+//   const children = response.data.data.children
+//   console.log(children[children.length - 1])
+//   // let post_ID = response.data.data.children[0].data.id;
+//   // let commentTreeRequest = axios.get(`https://oauth.reddit.com/r/${subreddit}/comments/${post_ID}`, { headers })
+//   // commentTreeRequest.then((response) => {
+//   //   for (let i = 0; i < response.data.length; i++) {
+//   //     console.log(response.data[i]);
+//   //   }
+//   // })
+// })
