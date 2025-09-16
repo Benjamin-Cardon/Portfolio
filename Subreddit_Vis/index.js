@@ -1,7 +1,18 @@
 import axios from "axios";
 import 'dotenv/config';
 import { readFileSync, writeFileSync } from "fs";
+// Load wink-nlp package
+import winkNLP from 'wink-nlp';
+
+// Load English language model
+import model from 'wink-eng-lite-web-model';
+
 // Get token
+const nlp = winkNLP(model);
+// Obtain "its" helper to extract item properties.
+const its = nlp.its;
+// Obtain "as" reducer helper to reduce a collection.
+const as = nlp.as;
 
 main();
 
@@ -10,15 +21,29 @@ function main() {
   check_auth_token_expired(tokenholder);
 
   let subreddit = 'datascience';
-  subreddit = "DeweyGetOutOfThere"
   const headers = {
     "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
   }
 
   let data = [];
-  get_posts_until(headers, subreddit, data, 500).then(() => {
-    console.log(data)
-    console.log(data.length)
+  get_posts_until(headers, subreddit, data, 100).then(() => {
+    let user_likes = {}
+    data.forEach((el, ind, arr) => {
+      if (user_likes[el.data.author] == undefined) {
+        user_likes[el.data.author] = {
+          post_count: 1,
+          num_comments: el.data.num_comments,
+          total_upvotes: el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
+          total_downvotes: (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
+        }
+      } else {
+        user_likes[el.data.author].post_count += 1;
+        user_likes[el.data.author].num_comments += el.data.num_comments;
+        user_likes[el.data.author].total_upvotes += el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
+        user_likes[el.data.author].total_downvotes += (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
+      }
+    })
+    console.log(user_likes)
   })
 
 
