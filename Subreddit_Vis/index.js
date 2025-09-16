@@ -9,14 +9,27 @@ function main() {
   let tokenholder = { token: "" };
   check_auth_token_expired(tokenholder);
 
-  let subreddit = 'datascience'
+  let subreddit = 'datascience';
+  const headers = {
+    "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
+  }
   let request_instance = axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
-    headers: {
-      "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
-    }
+    headers
   })
   request_instance.then((response) => {
-    console.log(response.data)
+    const children = response.data.data.children
+    let sum = 0;
+    for (let i = 0; i < children.length; i++) {
+      sum += children[i].data.num_comments;
+    }
+    console.log("IN The 25 newest articles- there are this many comments: " + sum)
+    // let post_ID = response.data.data.children[0].data.id;
+    // let commentTreeRequest = axios.get(`https://oauth.reddit.com/r/${subreddit}/comments/${post_ID}`, { headers })
+    // commentTreeRequest.then((response) => {
+    //   for (let i = 0; i < response.data.length; i++) {
+    //     console.log(response.data[i]);
+    //   }
+    // })
   })
 
 }
@@ -46,7 +59,9 @@ async function get_and_save_auth_token(tokenholder) {
   });
   await Promise.resolve(tokenresponse);
 }
-
+//Count- How many posts we will request until
+// Timeprev- unixtime
+async function get_posts_until() { }
 // https://oauth.reddit.com/r/${subreddit}/new
 
 // read token.txt.
@@ -55,3 +70,10 @@ async function get_and_save_auth_token(tokenholder) {
 //  calculate a new expiration date- date now + time in seconds.
 //  overwrite the file with the new expirationdate and time in seconds.
 // else, we will retrieve the old token.
+// Notes on the API: When we request  at the current point, we're given the 25 most recent posts, with the ID of the post directly after them. We can use that ID to make multiple calls if we want to.
+//>>> submission = reddit.submission("nej10s")
+// >>> ratio = submission.upvote_ratio
+// >>> ups = round((ratio*submission.score)/(2*ratio - 1)) if ratio != 0.5 else round(submission.score/2)
+// >>> downs = ups - submission.score
+// >>> ups,downs
+// 2 1
