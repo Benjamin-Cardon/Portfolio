@@ -16,17 +16,20 @@ const as = nlp.as;
 
 main();
 
-function main() {
+async function main() {
   let tokenholder = { token: "" };
-  check_auth_token_expired(tokenholder);
+  await check_auth_token_expired(tokenholder);
 
-  let subreddit = 'datascience';
+  let subreddit = 'dataengineering';
   const headers = {
     "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
   }
 
   let data = [];
-  get_posts_until(headers, subreddit, data, 5000)
+  await get_posts_until(headers, subreddit, data, 5000)
+  let user_likes = {}
+  count_user_votes(data, user_likes)
+  // convert_userinfo_csv(user_likes)
 }
 
 function count_user_votes(data, user_likes) {
@@ -45,59 +48,77 @@ function count_user_votes(data, user_likes) {
       user_likes[el.data.author].total_downvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
     }
   })
-  convert_userinfo_csv(user_likes)
 }
 
 async function check_auth_token_expired(tokenholder) {
-  const tokenfile = readFileSync('token.txt', 'utf-8').split(':::')
-  if (Number(tokenfile[0]) < ((Date.now() / 1000) - 60)) {
-    await get_and_save_auth_token(tokenholder)
-    console.log("Token Expired")
-  }
-  else {
-    console.log("Token Still Good")
-    tokenholder.token = tokenfile[1];
-  }
+  try {
+    const tokenfile = readFileSync('token.txt', 'utf-8').split(':::');
+    const expiration = Number(tokenfile[0]);
 
+    if (expiration < ((Date.now() / 1000) - 60)) {
+      console.log("Token Expired");
+      await get_and_save_auth_token(tokenholder);
+    } else {
+      console.log("Token Still Good")
+      tokenholder.token = tokenfile[1];
+    }
+  }
+  catch (err) {
+    console.log("No token found, fetching new one...");
+    await get_and_save_auth_token(tokenholder);
+  }
 }
 
 async function get_and_save_auth_token(tokenholder) {
-  let tokenresponse = axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
-    auth: { username: process.env.REDDIT_CLIENTID, password: process.env.REDDIT_SECRET },
-    headers: { "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", "Content-Type": "application/x-www-form-urlencoded" }
-  })
-  tokenresponse.then(function (response) {
+  try {
+    const response = await axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
+      auth: {
+        username: process.env.REDDIT_CLIENTID,
+        password: process.env.REDDIT_SECRET
+      },
+      headers: {
+        "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
+        "Content-Type": "application/x-www-form-urlencoded"
+      }
+    });
     const expiration_date = Math.floor(Date.now() / 1000) + response.data.expires_in;
     tokenholder.token = response.data.access_token;
     writeFileSync('token.txt', expiration_date + ":::" + tokenholder.token);
-  });
-  await Promise.resolve(tokenresponse);
+    console.log("New Token Saved")
+  } catch (err) {
+    console.error("Failed to get new token:", err.response?.data || err.message);
+    throw err;
+  }
 }
 // type. Current options
 //Count- How many posts we will request until
 // Timeprev- unixtime period
-async function get_posts_until(headers, subreddit, data, count, after = null) {
+async function get_posts_until(headers, subreddit, data, count,) {
   const limit = 100;
-  // TODO: Add error checking. Since this will be production, consider typescript? For now- that's too much.
+  let after = null;
   const params = { limit };
-  if (after) params.after = after;
-  const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
-    headers, params
-  })
-  const children = response.data.data.children
-  data.push(...children)
-  if (children.length < limit || response.data.data.after === null || children.length >= count || data.length >= count) {
-    while (data.length > count) {
-      data.pop()
+
+  while (data.length < count) {
+    try {
+      if (after) params.after = after;
+      const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
+        headers, params
+      })
+      const children = response.data.data.children;
+      if (!children || children.length === 0) break;
+      data.push(...children)
+      after = response.data.data.after;
+      if (!after) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (err) {
+      console.error("error fetching posts:", err.message)
+      break;
     }
-    let user_likes = {}
-    count_user_votes(data, user_likes)
-    console.log(data.length)
-    return;
   }
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  console.log("Slept one second")
-  return get_posts_until(headers, subreddit, data, count, response.data.data.after)
+  if (data.length > count) {
+    data.length = count;
+  }
+  console.log(data.length)
 }
 
 
