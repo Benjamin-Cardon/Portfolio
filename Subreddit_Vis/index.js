@@ -26,27 +26,26 @@ function main() {
   }
 
   let data = [];
-  get_posts_until(headers, subreddit, data, 100).then(() => {
-    let user_likes = {}
-    data.forEach((el, ind, arr) => {
-      if (user_likes[el.data.author] == undefined) {
-        user_likes[el.data.author] = {
-          post_count: 1,
-          num_comments: el.data.num_comments,
-          total_upvotes: el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
-          total_downvotes: (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
-        }
-      } else {
-        user_likes[el.data.author].post_count += 1;
-        user_likes[el.data.author].num_comments += el.data.num_comments;
-        user_likes[el.data.author].total_upvotes += el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
-        user_likes[el.data.author].total_downvotes += (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
+  get_posts_until(headers, subreddit, data, 5000)
+}
+
+function count_user_votes(data, user_likes) {
+  data.forEach((el, ind, arr) => {
+    if (user_likes[el.data.author] == undefined) {
+      user_likes[el.data.author] = {
+        post_count: 1,
+        num_comments: el.data.num_comments,
+        total_upvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
+        total_downvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
       }
-    })
-    console.log(user_likes)
+    } else {
+      user_likes[el.data.author].post_count += 1;
+      user_likes[el.data.author].num_comments += el.data.num_comments;
+      user_likes[el.data.author].total_upvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.score == 0 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
+      user_likes[el.data.author].total_downvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
+    }
   })
-
-
+  convert_userinfo_csv(user_likes)
 }
 
 async function check_auth_token_expired(tokenholder) {
@@ -77,45 +76,40 @@ async function get_and_save_auth_token(tokenholder) {
 // type. Current options
 //Count- How many posts we will request until
 // Timeprev- unixtime period
-async function get_posts_until(headers, subreddit, data, count, before) {
+async function get_posts_until(headers, subreddit, data, count, after = null) {
   const limit = 100;
   // TODO: Add error checking. Since this will be production, consider typescript? For now- that's too much.
-  if (data.length == count) {
+  const params = { limit };
+  if (after) params.after = after;
+  const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
+    headers, params
+  })
+  const children = response.data.data.children
+  data.push(...children)
+  if (children.length < limit || response.data.data.after === null || children.length >= count || data.length >= count) {
+    while (data.length > count) {
+      data.pop()
+    }
+    let user_likes = {}
+    count_user_votes(data, user_likes)
     console.log(data.length)
     return;
   }
-  const params = {
-    limit,
-  }
-  if (before != undefined) {
-    params.before = before;
-  }
-  let request_instance = axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
-    headers, params
-  })
-  await request_instance.then((response) => {
-    let children = response.data.data.children;
-    data.push(...children)
-    // oh my god it hurts it hurts so fucking bad.
-    // we'll have to measure the efficiency of this code.
-    if (children.length < limit || response.data.data.after === null) {
-      return;
-    }
-    if (children.length >= count) {
-      return;
-    } else {
-      before = children[children.length - 1].data.id;
-      setTimeout(() => {
-        console.log("Sleep one second");
-      }, 1000);
-      get_posts_until(headers, subreddit, data, count, before)
-    }
-  })
-
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  console.log("Slept one second")
+  return get_posts_until(headers, subreddit, data, count, response.data.data.after)
 }
 
 
+function convert_userinfo_csv(data) {
+  const arr = ['author,post_count,num_comments,total_upvotes,total_downvotes'];
 
+  for (const [key, value] of Object.entries(data)) {
+    arr.push(key + ',' + value.post_count + ',' + value.num_comments + ',' + value.total_upvotes + ',' + value.total_downvotes)
+  }
+  const str = arr.join('\n')
+  writeFileSync('userreport.csv', str)
+}
 // https://oauth.reddit.com/r/${subreddit}/new
 
 // read token.txt.
