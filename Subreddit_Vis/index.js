@@ -8,7 +8,7 @@ import winkNLP from 'wink-nlp';
 import model from 'wink-eng-lite-web-model';
 
 // Get token
-const nlp = winkNLP(model);
+const nlp = winkNLP(model, ['sbd', 'negation', 'sentiment', 'ner', 'pos']);
 // Obtain "its" helper to extract item properties.
 const its = nlp.its;
 // Obtain "as" reducer helper to reduce a collection.
@@ -26,10 +26,13 @@ async function main() {
   }
 
   let data = [];
-  await get_posts_until(headers, subreddit, data, 5000)
+  await get_posts_until(headers, subreddit, data, 1000)
   let user_likes = {}
   count_user_votes(data, user_likes)
   // convert_userinfo_csv(user_likes)
+  console.log(data[0])
+  word_frequency_sentiment_by_user(data, user_likes, {})
+
 }
 
 function count_user_votes(data, user_likes) {
@@ -130,6 +133,44 @@ function convert_userinfo_csv(data) {
   }
   const str = arr.join('\n')
   writeFileSync('userreport.csv', str)
+}
+
+function word_frequency_sentiment_by_user(data, user_likes, words) {
+  for (const post of data) {
+    const author = post.data.author;
+    const text = post.data.title + post.data.selftext;
+    const doc = nlp.readDoc(text);
+    const frequency_table = doc.tokens()
+      .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+      .out(its.lemma, as.freqTable);
+    // console.log(frequency_table)
+    // console.log(doc.out(its.sentiment))
+    for (const [word, frequency] of frequency_table) {
+      if (!words[word]) {
+        words[word] = {};
+        words[word]['count'] = frequency
+        words[word]['total_upvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
+        words[word]['total_downvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
+        words[word]['num_comments'] = post.data.num_comments;
+        words[word]['post_count'] = 1;
+      } else {
+        words[word].count += frequency
+        words[word].total_upvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
+        words[word].total_downvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
+        words[word].num_comments += post.data.num_comments;
+        words[word].post_count += 1;
+      }
+    }
+  }
+  console.log(words)
+
+  const arr = ['word, frequency, post_count,total_upvotes,total_downvotes,comments'];
+
+  for (const [key, value] of Object.entries(words)) {
+    arr.push(key + ',' + value.count + ',' + value.post_count + ',' + value.total_upvotes + ',' + value.total_downvotes + ',' + value.num_comments)
+  }
+  const str = arr.join('\n')
+  writeFileSync('wordreport.csv', str)
 }
 // https://oauth.reddit.com/r/${subreddit}/new
 
