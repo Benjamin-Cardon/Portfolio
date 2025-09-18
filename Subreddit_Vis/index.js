@@ -14,25 +14,31 @@ const its = nlp.its;
 // Obtain "as" reducer helper to reduce a collection.
 const as = nlp.as;
 
+
 main();
 
 async function main() {
   let tokenholder = { token: "" };
   await check_auth_token_expired(tokenholder);
 
-  let subreddit = 'dataengineering';
+  let subreddit = 'sjfsdjgjjsjejcjsj';
   const headers = {
     "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
   }
 
-  let data = [];
-  await get_posts_until(headers, subreddit, data, 1000)
-  let user_likes = {}
-  count_user_votes(data, user_likes)
-  // convert_userinfo_csv(user_likes)
-  console.log(data[0])
-  word_frequency_sentiment_by_user(data, user_likes, {})
+  if (! await check_subreddit_public_sfw_exists(headers, subreddit)) {
+    console.log("This is not a public, sfw subreddit!");
+    return;
+  }
+  console.log("acceptable subreddit")
 
+  // let data = [];
+  // await get_posts_until(headers, subreddit, data, 1000)
+  // let user_likes = {}
+  // count_user_votes(data, user_likes)
+  // // convert_userinfo_csv(user_likes)
+  // console.log(data[0])
+  // word_frequency_sentiment_by_user(data, user_likes, {})
 }
 
 function count_user_votes(data, user_likes) {
@@ -135,6 +141,7 @@ function convert_userinfo_csv(data) {
   writeFileSync('userreport.csv', str)
 }
 
+
 function word_frequency_sentiment_by_user(data, user_likes, words) {
   for (const post of data) {
     const author = post.data.author;
@@ -153,6 +160,9 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
         words[word]['total_downvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
         words[word]['num_comments'] = post.data.num_comments;
         words[word]['post_count'] = 1;
+        words[word]['positive_sent_freq'] = 0;
+        words[word]['neutral_sent_freq'] = 0;
+        words[word]['negative_sent_freq'] = 0;
       } else {
         words[word].count += frequency
         words[word].total_upvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
@@ -161,16 +171,66 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
         words[word].post_count += 1;
       }
     }
-  }
-  console.log(words)
+    const Sentiment_categorization_boundary = .3;
+    doc.sentences().each((sentence) => {
+      const sentiment = sentence.out(its.sentiment);
+      // console.log(`The following sentence is given a sentiment of ${sentiment}` + sentence.out())
+      const frequency_table = sentence.tokens()
+        .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+        .out(its.lemma, as.freqTable);
 
-  const arr = ['word, frequency, post_count,total_upvotes,total_downvotes,comments'];
+      for (const [word, frequency] of frequency_table) {
+        if (sentiment > Sentiment_categorization_boundary) {
+          words[word].positive_sent_freq += frequency;
+        } else if (sentiment < -Sentiment_categorization_boundary) {
+          words[word].negative_sent_freq += frequency;
+        } else {
+          words[word].neutral_sent_freq += frequency;
+        }
+      }
+    });
+
+  }
+  //console.log(words)
+
+  const arr = ['word, frequency, post_count,total_upvotes,total_downvotes,comments,neg_sent_freq,pos_sent_freq,neu_sent_freq'];
 
   for (const [key, value] of Object.entries(words)) {
-    arr.push(key + ',' + value.count + ',' + value.post_count + ',' + value.total_upvotes + ',' + value.total_downvotes + ',' + value.num_comments)
+    arr.push(key + ',' + value.count + ',' + value.post_count + ',' + value.total_upvotes + ',' + value.total_downvotes + ',' + value.num_comments + ',' + value.negative_sent_freq + ',' + value.positive_sent_freq + ',' + value.neutral_sent_freq)
   }
   const str = arr.join('\n')
   writeFileSync('wordreport.csv', str)
+}
+
+async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
+  try {
+    const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/about`, {
+      headers,
+    })
+    if (response.data.data.subreddit_type == undefined && response.data.data.over18 == undefined) {
+      subreddit_does_not_exist == true;
+      console.log("Subreddit Does Not Exist")
+    }
+    return response.data.data.subreddit_type == 'public' && !response.data.data.over18;
+  } catch (err) {
+    if (err.status == 400) {
+      console.log("Axios Bad request");
+      return false;
+    } else if (err.status == 401) {
+      console.log("Authorization Error");
+      return false;
+    } else if (err.status == 403) {
+      console.log("Private Subreddit")
+      subreddit_private = true;
+      return false;
+    } else if (err.status == 404) {
+      subreddit_does_not_exist = true;
+      return false;
+    } else {
+      console.log(err);
+      return false;
+    }
+  }
 }
 // https://oauth.reddit.com/r/${subreddit}/new
 
