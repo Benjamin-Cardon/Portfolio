@@ -39,7 +39,7 @@ async function main() {
   convert_userinfo_csv(user_likes)
   console.log(data[0])
   word_frequency_sentiment_by_user(data, user_likes, {})
-  console.log(user_likes)
+  console.log(Object.entries(user_likes['___words___']).filter(([key, value]) => value.authors.length > 3).map(([key, value]) => `${key}: has authors ` + value.authors.join(',')))
 }
 
 function count_user_votes(data, user_likes) {
@@ -144,8 +144,10 @@ function convert_userinfo_csv(data) {
 
 
 function word_frequency_sentiment_by_user(data, user_likes, words) {
+  user_likes['___words___'] = {}
+
   for (const post of data) {
-    const author = post.data.author;
+    let author = post.data.author;
     const text = post.data.title + post.data.selftext;
     const doc = nlp.readDoc(text);
     const frequency_table = doc.tokens()
@@ -153,10 +155,11 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
       .out(its.lemma, as.freqTable);
     // console.log(frequency_table)
     // console.log(doc.out(its.sentiment))
-    user_likes['___words___'] = {}
+
     if (!user_likes[author]['___words___']) {
       user_likes[author]['___words___'] = {};
     }
+
     for (const [word, frequency] of frequency_table) {
       if (!words[word]) {
         words[word] = {};
@@ -176,12 +179,18 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
         words[word].post_count += 1;
       }
       if (!user_likes['___words___'][word]) {
-        user_likes['___words___'][word] = { ...words[word] };
+        user_likes['___words___'][word] = { ...words[word], 'authors': [author] };
       } else {
         Object.entries(words[word]).forEach(([key, value]) => {
-          user_likes['___words___'][word] += value;
+          if (key != 'authors') {
+            user_likes['___words___'][word][key] += value;
+          }
         })
+        if (!user_likes['___words___'][word].authors.includes(author)) {
+          user_likes['___words___'][word].authors.push(author);
+        }
       }
+
       if (!user_likes[author]['___words___'][word]) {
         user_likes[author]['___words___'][word] = { ...words[word] }
       } else {
