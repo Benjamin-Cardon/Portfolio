@@ -21,7 +21,7 @@ async function main() {
   let tokenholder = { token: "" };
   await check_auth_token_expired(tokenholder);
 
-  let subreddit = 'sjfsdjgjjsjejcjsj';
+  let subreddit = 'dataengineering';
   const headers = {
     "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
   }
@@ -32,13 +32,14 @@ async function main() {
   }
   console.log("acceptable subreddit")
 
-  // let data = [];
-  // await get_posts_until(headers, subreddit, data, 1000)
-  // let user_likes = {}
-  // count_user_votes(data, user_likes)
-  // // convert_userinfo_csv(user_likes)
-  // console.log(data[0])
-  // word_frequency_sentiment_by_user(data, user_likes, {})
+  let data = [];
+  await get_posts_until(headers, subreddit, data, 1000)
+  let user_likes = {}
+  count_user_votes(data, user_likes)
+  convert_userinfo_csv(user_likes)
+  console.log(data[0])
+  word_frequency_sentiment_by_user(data, user_likes, {})
+  console.log(user_likes)
 }
 
 function count_user_votes(data, user_likes) {
@@ -152,6 +153,10 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
       .out(its.lemma, as.freqTable);
     // console.log(frequency_table)
     // console.log(doc.out(its.sentiment))
+    user_likes['___words___'] = {}
+    if (!user_likes[author]['___words___']) {
+      user_likes[author]['___words___'] = {};
+    }
     for (const [word, frequency] of frequency_table) {
       if (!words[word]) {
         words[word] = {};
@@ -170,7 +175,23 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
         words[word].num_comments += post.data.num_comments;
         words[word].post_count += 1;
       }
+      if (!user_likes['___words___'][word]) {
+        user_likes['___words___'][word] = { ...words[word] };
+      } else {
+        Object.entries(words[word]).forEach(([key, value]) => {
+          user_likes['___words___'][word] += value;
+        })
+      }
+      if (!user_likes[author]['___words___'][word]) {
+        user_likes[author]['___words___'][word] = { ...words[word] }
+      } else {
+        Object.entries(words[word]).forEach(([key, value]) => {
+          user_likes[author]['___words___'][word] += value;
+        })
+      }
     }
+
+
     const Sentiment_categorization_boundary = .3;
     doc.sentences().each((sentence) => {
       const sentiment = sentence.out(its.sentiment);
@@ -189,7 +210,6 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
         }
       }
     });
-
   }
   //console.log(words)
 
