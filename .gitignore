@@ -1,5 +1,5 @@
 node_modules/
 *.env
-/Subreddit_Vis/token.txt
-/Subreddit_Vis/userreport.csv
-/Subreddit_Vis/wordreport.csv
+/Subreddit_Vis/Backend/token.txt
+/Subreddit_Vis/Backend/userreport.csv
+/Subreddit_Vis/Backend/wordreport.csv

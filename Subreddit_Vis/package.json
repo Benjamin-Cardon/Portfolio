@@ -13,7 +13,11 @@
     "axios": "^1.11.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "react-dom": "^19.1.1",
     "wink-eng-lite-web-model": "^1.8.1",
     "wink-nlp": "^2.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
   }
 }
