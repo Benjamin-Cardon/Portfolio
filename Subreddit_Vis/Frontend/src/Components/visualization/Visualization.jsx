@@ -12,12 +12,12 @@ export default function Visualization() {
     <div id='vizualization_main_grid' className='debug-grid' style={{
       display: 'grid', gridTemplateColumns: '2fr 7fr 1fr', gridTemplateRows: '1fr 1fr 8fr', height: 'calc(100vh - 30px)', width: 'calc(100vw - 30px)'
     }}>
-      <Summary layoutStyle={{ gridColumnStart: '1', gridColumnEnd: '1', gridRowStart: '1', gridRowEnd: '3', placeSelf: 'stretch' }} />
-      <Details layoutStyle={{ gridColumnStart: '1', gridColumnEnd: '1', gridRowStart: '3', gridRowEnd: '4', placeSelf: 'stretch' }} />
-      <DataSelection layoutStyle={{ gridColumnStart: '2', gridColumnEnd: '2', gridRowStart: '1', gridRowEnd: '1', placeSelf: 'stretch' }} />
-      <SubredditInfo layoutStyle={{ gridColumnStart: '3', gridColumnEnd: '3', gridRowStart: '1', gridRowEnd: '1', placeSelf: 'stretch' }} />
-      <DisplayOptions layoutStyle={{ gridColumnStart: '3', gridColumnEnd: '3', gridRowStart: '2', gridRowEnd: '4', placeSelf: 'stretch' }} />
-      <DiscourseVisualization layoutStyle={{ gridColumnStart: '2', gridColumnEnd: '2', gridRowStart: '2', gridRowEnd: '4', placeSelf: 'stretch' }} />
+      <Summary layoutStyle={{ gridColumnStart: '1', gridColumnEnd: '1', gridRowStart: '1', gridRowEnd: '3', placeSelf: 'stretch', margin: '0', padding: '1.5vw' }} />
+      <Details layoutStyle={{ gridColumnStart: '1', gridColumnEnd: '1', gridRowStart: '3', gridRowEnd: '4', placeSelf: 'stretch', margin: '0', padding: '1.5vw' }} />
+      <DataSelection layoutStyle={{ gridColumnStart: '2', gridColumnEnd: '2', gridRowStart: '1', gridRowEnd: '1', placeSelf: 'stretch', margin: '0', padding: '1.5vw' }} />
+      <SubredditInfo layoutStyle={{ gridColumnStart: '3', gridColumnEnd: '3', gridRowStart: '1', gridRowEnd: '1', placeSelf: 'stretch', margin: '0', padding: '1.5vw' }} />
+      <DisplayOptions layoutStyle={{ gridColumnStart: '3', gridColumnEnd: '3', gridRowStart: '2', gridRowEnd: '4', placeSelf: 'stretch', margin: '0', padding: '1.5vw' }} />
+      <DiscourseVisualization layoutStyle={{ gridColumnStart: '2', gridColumnEnd: '2', gridRowStart: '2', gridRowEnd: '4', placeSelf: 'stretch', margin: '0', padding: '1.5vw' }} />
     </div>
   );
 }

@@ -7,6 +7,10 @@
   position: relative;
 }
 
+* {
+  margin: 0;
+}
+
 /* Show padding and border areas */
 .debug *::before {
   content: " ";
