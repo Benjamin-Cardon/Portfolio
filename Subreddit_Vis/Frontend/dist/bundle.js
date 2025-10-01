@@ -1300,7 +1300,7 @@
           return dispatcher;
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var React3 = require_react(), Internals = {
+        var React11 = require_react(), Internals = {
           d: {
             f: noop,
             r: function() {
@@ -1318,7 +1318,7 @@
           },
           p: 0,
           findDOMNode: null
-        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React3.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React11.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
         "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
           "React depends on Map and Set built-in types. Make sure that you load a polyfill in older browsers. https://reactjs.org/link/react-polyfills"
         );
@@ -2860,7 +2860,7 @@
           "number" === type && getActiveElement(node.ownerDocument) === node || node.defaultValue === "" + value || (node.defaultValue = "" + value);
         }
         function validateOptionProps(element, props) {
-          null == props.value && ("object" === typeof props.children && null !== props.children ? React3.Children.forEach(props.children, function(child) {
+          null == props.value && ("object" === typeof props.children && null !== props.children ? React11.Children.forEach(props.children, function(child) {
             null == child || "string" === typeof child || "number" === typeof child || "bigint" === typeof child || didWarnInvalidChild || (didWarnInvalidChild = true, console.error(
               "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
             ));
@@ -16442,14 +16442,14 @@
           ));
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var Scheduler = require_scheduler(), React3 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
+        var Scheduler = require_scheduler(), React11 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
         Symbol.for("react.scope");
         var REACT_ACTIVITY_TYPE = Symbol.for("react.activity");
         Symbol.for("react.legacy_hidden");
         Symbol.for("react.tracing_marker");
         var REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel");
         Symbol.for("react.view_transition");
-        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React3.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
+        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React11.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
           pending: false,
           data: null,
           method: null,
@@ -19171,7 +19171,7 @@
           }
         };
         (function() {
-          var isomorphicReactPackageVersion = React3.version;
+          var isomorphicReactPackageVersion = React11.version;
           if ("19.1.1" !== isomorphicReactPackageVersion)
             throw Error(
               'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.1.1\nLearn more: https://react.dev/warnings/version-mismatch")
@@ -19312,19 +19312,78 @@
   });
 
   // Frontend/src/index.jsx
-  var import_react2 = __toESM(require_react(), 1);
+  var import_react10 = __toESM(require_react(), 1);
   var import_client = __toESM(require_client(), 1);
 
   // Frontend/src/App.jsx
+  var import_react9 = __toESM(require_react(), 1);
+
+  // Frontend/src/Components/visualization/Visualization.jsx
+  var import_react7 = __toESM(require_react(), 1);
+
+  // Frontend/src/Components/visualization/summary/Summary.jsx
   var import_react = __toESM(require_react(), 1);
+  function Summary({ layoutStyle }) {
+    return /* @__PURE__ */ import_react.default.createElement("div", { id: "summaryContainer", style: layoutStyle }, /* @__PURE__ */ import_react.default.createElement("h1", null, "Summary"));
+  }
+
+  // Frontend/src/Components/visualization/details/Details.jsx
+  var import_react2 = __toESM(require_react(), 1);
+  function Details({ layoutStyle }) {
+    return /* @__PURE__ */ import_react2.default.createElement("div", { id: "detailsContainer", style: layoutStyle }, /* @__PURE__ */ import_react2.default.createElement("h1", null, "Details"));
+  }
+
+  // Frontend/src/Components/visualization/data_selection/DataSelection.jsx
+  var import_react3 = __toESM(require_react(), 1);
+  function DataSelection({ layoutStyle }) {
+    return /* @__PURE__ */ import_react3.default.createElement("div", { id: "dataSelectionContainer", style: layoutStyle }, /* @__PURE__ */ import_react3.default.createElement("h1", null, "Data Selection"));
+  }
+
+  // Frontend/src/Components/visualization/subreddit_info/SubredditInfo.jsx
+  var import_react4 = __toESM(require_react(), 1);
+  function SubredditInfo({ layoutStyle }) {
+    return /* @__PURE__ */ import_react4.default.createElement("div", { id: "subredditInfoContainer", style: layoutStyle }, /* @__PURE__ */ import_react4.default.createElement("h1", null, "Info"));
+  }
+
+  // Frontend/src/Components/visualization/display_options/DisplayOptions.jsx
+  var import_react5 = __toESM(require_react(), 1);
+  function DisplayOptions({ layoutStyle }) {
+    return /* @__PURE__ */ import_react5.default.createElement("div", { id: "displayOptionsContainer", style: layoutStyle }, /* @__PURE__ */ import_react5.default.createElement("h1", null, "opt"));
+  }
+
+  // Frontend/src/Components/visualization/discourse_visualization/DiscourseVisualization.jsx
+  var import_react6 = __toESM(require_react(), 1);
+  function DiscourseVisualization({ layoutStyle }) {
+    return /* @__PURE__ */ import_react6.default.createElement("div", { id: "discourseVisualizationContainer", style: layoutStyle }, /* @__PURE__ */ import_react6.default.createElement("h1", null, "Visualization"));
+  }
+
+  // Frontend/src/Components/visualization/Visualization.jsx
+  function Visualization() {
+    return /* @__PURE__ */ import_react7.default.createElement("div", { id: "vizualization_main_grid", className: "debug-grid", style: {
+      display: "grid",
+      gridTemplateColumns: "2fr 7fr 1fr",
+      gridTemplateRows: "1fr 1fr 8fr",
+      height: "calc(100vh - 30px)",
+      width: "calc(100vw - 30px)"
+    } }, /* @__PURE__ */ import_react7.default.createElement(Summary, { layoutStyle: { gridColumnStart: "1", gridColumnEnd: "1", gridRowStart: "1", gridRowEnd: "3", placeSelf: "stretch" } }), /* @__PURE__ */ import_react7.default.createElement(Details, { layoutStyle: { gridColumnStart: "1", gridColumnEnd: "1", gridRowStart: "3", gridRowEnd: "4", placeSelf: "stretch" } }), /* @__PURE__ */ import_react7.default.createElement(DataSelection, { layoutStyle: { gridColumnStart: "2", gridColumnEnd: "2", gridRowStart: "1", gridRowEnd: "1", placeSelf: "stretch" } }), /* @__PURE__ */ import_react7.default.createElement(SubredditInfo, { layoutStyle: { gridColumnStart: "3", gridColumnEnd: "3", gridRowStart: "1", gridRowEnd: "1", placeSelf: "stretch" } }), /* @__PURE__ */ import_react7.default.createElement(DisplayOptions, { layoutStyle: { gridColumnStart: "3", gridColumnEnd: "3", gridRowStart: "2", gridRowEnd: "4", placeSelf: "stretch" } }), /* @__PURE__ */ import_react7.default.createElement(DiscourseVisualization, { layoutStyle: { gridColumnStart: "2", gridColumnEnd: "2", gridRowStart: "2", gridRowEnd: "4", placeSelf: "stretch" } }));
+  }
+
+  // Frontend/src/Components/search/Search.jsx
+  var import_react8 = __toESM(require_react(), 1);
+  function Search() {
+    return /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("h1", null, "Header Text to make header take space and be seeable"));
+  }
+
+  // Frontend/src/App.jsx
   function App() {
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h1", null, "Header Text to make header take space and be seeable"));
+    const currentlyworkingon = true;
+    return /* @__PURE__ */ import_react9.default.createElement("div", { className: "debug" }, currentlyworkingon ? /* @__PURE__ */ import_react9.default.createElement(Visualization, null) : /* @__PURE__ */ import_react9.default.createElement(Search, null));
   }
 
   // Frontend/src/index.jsx
   var container = document.getElementById("root");
   var root = (0, import_client.createRoot)(container);
-  root.render(/* @__PURE__ */ import_react2.default.createElement(App, null));
+  root.render(/* @__PURE__ */ import_react10.default.createElement(App, null));
 })();
 /*! Bundled license information:
 

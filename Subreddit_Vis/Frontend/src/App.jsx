@@ -1,9 +1,12 @@
 import React from "react";
-
+import Visualization from './Components/visualization/Visualization';
+import Search from './Components/search/Search';
 export default function App() {
+  const currentlyworkingon = true;
+
   return (
-    <div>
-      <h1>Header Text to make header take space and be seeable</h1>
+    <div className='debug'>
+      {currentlyworkingon ? <Visualization /> : <Search />}
     </div>
   );
 }
