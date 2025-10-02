@@ -9,13 +9,14 @@
   "scripts": {
     "test": "test",
     "build": "esbuild Frontend/src/index.jsx --bundle --outfile=Frontend/dist/bundle.js --loader:.js=jsx --loader:.jsx=jsx",
-    "dev": "esbuild Frontend/src/index.jsx --bundle --outfile=Frontend/dist/bundle.js --loader:.jsx=jsx --watch & live-server ."
+    "dev": "node Frontend/esbuild.config.js --watch & live-server Frontend/dist --port=3000"
   },
   "dependencies": {
     "axios": "^1.11.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
-    "react-dom": "^19.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "wink-eng-lite-web-model": "^1.8.1",
     "wink-nlp": "^2.4.0"
   },

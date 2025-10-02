@@ -1,0 +1,101 @@
+/* debug.css */
+
+/* General box model visualization */
+.debug * {
+  outline: 1px solid rgba(0, 128, 255, 0.3);
+  /* light blue outline */
+  position: relative;
+}
+
+* {
+  margin: 0;
+}
+
+/* Show padding and border areas */
+.debug *::before {
+  content: " ";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 255, 0, 0.05);
+  /* greenish = padding area */
+  pointer-events: none;
+  z-index: 9998;
+}
+
+.debug * {
+  border: 1px dashed rgba(255, 0, 0, 0.3);
+  /* red dashed = border */
+}
+
+/* Flexbox containers */
+.debug [style*="flex"],
+.debug .flex,
+.debug [class*="flex"] {
+  outline: 2px solid magenta !important;
+  background-image: repeating-linear-gradient(45deg,
+      rgba(255, 0, 255, 0.1),
+      rgba(255, 0, 255, 0.1) 10px,
+      transparent 10px,
+      transparent 20px);
+}
+
+/* CSS Grid containers */
+.debug [style*="grid"],
+.debug .grid,
+.debug [class*="grid"] {
+  outline: 2px solid limegreen !important;
+  background-image: repeating-linear-gradient(to right,
+      rgba(0, 255, 0, 0.1) 0 1px,
+      transparent 1px 20px),
+    repeating-linear-gradient(to bottom,
+      rgba(0, 255, 0, 0.1) 0 1px,
+      transparent 1px 20px);
+}
+
+/* Debug labels (shows element type) */
+.debug *::after {
+  content: attr(class);
+  font-size: 10px;
+  color: #000;
+  background: rgba(255, 255, 0, 0.5);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  pointer-events: none;
+  padding: 0 2px;
+}
+
+.debug-grid {
+  position: relative;
+  outline: 2px dashed rgba(0, 200, 255, 0.6);
+  /* outline around the whole grid */
+}
+
+.debug-grid>* {
+  outline: 1px solid rgba(255, 0, 0, 0.6);
+  /* each grid item */
+  background-clip: content-box;
+  /* so padding is visible */
+}
+
+/* Show padding inside each grid item */
+.debug-grid>*::before {
+  content: "padding";
+  display: block;
+  background: rgba(0, 255, 0, 0.1);
+  border: 1px dotted rgba(0, 255, 0, 0.6);
+  font-size: 10px;
+  color: rgba(0, 100, 0, 0.7);
+}
+
+/* Visualize grid gaps with background */
+.debug-grid {
+  background-image:
+    linear-gradient(to right, rgba(0, 200, 255, 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 200, 255, 0.2) 1px, transparent 1px);
+  background-size: var(--debug-grid-column, 20px) var(--debug-grid-row, 20px);
+}
