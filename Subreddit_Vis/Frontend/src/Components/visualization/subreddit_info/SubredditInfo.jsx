@@ -8,3 +8,4 @@ export default function SubredditInfo({ layoutStyle }) {
     </div>
   );
 }
+// let's include all of the subreddit information in a single component - it's the smallest component in the app, no need to overcomplicate

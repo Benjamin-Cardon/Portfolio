@@ -21481,7 +21481,7 @@
 
   // Frontend/src/Components/visualization/summary/Summary.jsx
   function Summary({ layoutStyle }) {
-    return /* @__PURE__ */ import_react3.default.createElement("div", { id: "summaryContainer", style: { ...layoutStyle, display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "stretch", gap: "1vw", padding: "1.5vw" } }, /* @__PURE__ */ import_react3.default.createElement(InfoButton, null), /* @__PURE__ */ import_react3.default.createElement(SummaryGraph, null), /* @__PURE__ */ import_react3.default.createElement("h3", null, " Summary"));
+    return /* @__PURE__ */ import_react3.default.createElement("div", { id: "summaryContainer", style: { ...layoutStyle, display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "stretch", gap: ".5vw", padding: "1.5vw" } }, /* @__PURE__ */ import_react3.default.createElement(InfoButton, null), /* @__PURE__ */ import_react3.default.createElement(SummaryGraph, null), /* @__PURE__ */ import_react3.default.createElement("h3", null, " Word/User, Percentile, Share "));
   }
 
   // Frontend/src/Components/visualization/details/Details.jsx
