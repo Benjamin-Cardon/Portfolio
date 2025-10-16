@@ -33,13 +33,14 @@ async function main() {
   console.log("acceptable subreddit")
 
   let data = [];
-  await get_posts_until(headers, subreddit, data, 1000)
+  await get_posts_until(headers, subreddit, data, 5)
+  await get_comment_trees(headers, subreddit, data);
+  console.log(data[1].comments.map((x) => x.data))
   let user_likes = {}
   count_user_votes(data, user_likes)
   convert_userinfo_csv(user_likes)
-  console.log(data[0])
   word_frequency_sentiment_by_user(data, user_likes, {})
-  console.log(Object.entries(user_likes['___words___']).filter(([key, value]) => value.authors.length > 3).map(([key, value]) => `${key}: has authors ` + value.authors.join(',')))
+  //console.log(Object.entries(user_likes['___words___']).filter(([key, value]) => value.authors.length > 3).map(([key, value]) => `${key}: has authors ` + value.authors.join(',')))
 }
 
 function count_user_votes(data, user_likes) {
@@ -131,6 +132,104 @@ async function get_posts_until(headers, subreddit, data, count,) {
   console.log(data.length)
 }
 
+async function get_comment_trees(headers, subreddit, data) {
+  const posts = [];
+  const more_nodes_request_queue = [];
+  // Request comment tree for all posts, and append comments to the post.comments value.
+  const postMap = new Map();
+  for (const post of data) {
+    const postId = post.data.name;
+    postMap.set(postId, post);
+    posts.push(axios
+      .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers })
+      .then((res) => {
+        // As soon as this one resolves, attach the comments to the post
+        post.comments = res.data[1].data.children;
+      })
+      .catch((err) => {
+        console.error(`Failed to load comments for post ${postId}`, err);
+      }));
+  }
+
+  await Promise.all(posts);
+
+  const commentMap = new Map();
+
+  for (const post of data) {
+    process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue);
+  }
+
+  while (more_nodes_request_queue.length > 0) {
+    const req = more_nodes_request_queue.shift();
+    const { parentNode, childrenIds } = req;
+    const url = `https://oauth.reddit.com/api/morechildren.json?link_id=t3_${req.postId}&children=${childrenIds.join(",")}`;
+    try {
+      const res = await axios.get(url, { headers });
+      const newChildren = res.data.json.data.things; // array of 't1' comments
+
+      for (const child of newChildren) {
+        if (child.kind == 'more') {
+          more_nodes_request_queue.push({
+            parentNode: parentNode,  // direct reference
+            postId: req.postId,
+            childrenIds: child.data.children,
+          });
+        } else {
+          commentMap.set(child.data.id, child)
+          process_comment_tree_into_map_and_queue(child, commentMap, more_nodes_request_queue, req.postId)
+        }
+      }
+      newChildren.forEach((child) => {
+        if (child.kind == 'more') {
+          return;
+        }
+        if (child.data.parent_id.slice(0, 2) == 't3') {
+          postMap.get(child.data.parent_id).data.comments.push(child);
+        } else if (child.data.parent_id.slice(0, 2) == 't1') {
+          if (commentMap.get(child.data.parent_id).data.replies == "") {
+            commentMap.get(child.data.parent_id).data.replies = [child];
+          } else {
+            commentMap.get(child.data.parent_id).data.replies.push(child)
+          }
+        }
+      })
+    } catch {
+      console.log("error")
+    }
+  }
+}
+
+function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_nodes_request_queue, postId) {
+  let queue = [];
+  if (rootNode.kind === 't3') { // post
+    queue = [...(rootNode.comments || [])];
+  } else if (rootNode.kind === 't1') { // comment
+    queue = rootNode.data.replies && rootNode.data.replies.data
+      ? [...rootNode.data.replies.data.children]
+      : [];
+  }
+
+  while (queue.length > 0) {
+    const node = queue.shift();
+
+    if (node.kind === 't1') {
+      commentMap.set(node.data.name, node);
+
+      // Push replies if they exist
+      if (node.data.replies && node.data.replies.data) {
+        queue.push(...node.data.replies.data.children);
+      }
+    } else if (node.kind === 'more') {
+      more_nodes_request_queue.push({
+        parentNode: node,   // direct reference
+        postId: postId,     // passed in
+        childrenIds: node.data.children,
+      });
+    } else {
+      console.log("Unexpected node kind:", node.kind);
+    }
+  }
+}
 
 function convert_userinfo_csv(data) {
   const arr = ['author,post_count,num_comments,total_upvotes,total_downvotes'];
@@ -141,7 +240,6 @@ function convert_userinfo_csv(data) {
   const str = arr.join('\n')
   writeFileSync('userreport.csv', str)
 }
-
 
 function word_frequency_sentiment_by_user(data, user_likes, words) {
   user_likes['___words___'] = {}
@@ -261,6 +359,7 @@ async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_d
     }
   }
 }
+
 // https://oauth.reddit.com/r/${subreddit}/new
 
 // read token.txt.
