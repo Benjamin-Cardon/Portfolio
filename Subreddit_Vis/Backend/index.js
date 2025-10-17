@@ -33,9 +33,9 @@ async function main() {
   console.log("acceptable subreddit")
 
   let data = [];
-  await get_posts_until(headers, subreddit, data, 5)
+  await get_posts_until(headers, subreddit, data, 950)
   await get_comment_trees(headers, subreddit, data);
-  console.log(data[1].comments.map((x) => x.data))
+  // console.log(data[1].comments.map((x) => x.data))
   let user_likes = {}
   count_user_votes(data, user_likes)
   convert_userinfo_csv(user_likes)
@@ -43,23 +43,6 @@ async function main() {
   //console.log(Object.entries(user_likes['___words___']).filter(([key, value]) => value.authors.length > 3).map(([key, value]) => `${key}: has authors ` + value.authors.join(',')))
 }
 
-function count_user_votes(data, user_likes) {
-  data.forEach((el, ind, arr) => {
-    if (user_likes[el.data.author] == undefined) {
-      user_likes[el.data.author] = {
-        post_count: 1,
-        num_comments: el.data.num_comments,
-        total_upvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
-        total_downvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
-      }
-    } else {
-      user_likes[el.data.author].post_count += 1;
-      user_likes[el.data.author].num_comments += el.data.num_comments;
-      user_likes[el.data.author].total_upvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.score == 0 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
-      user_likes[el.data.author].total_downvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
-    }
-  })
-}
 
 async function check_auth_token_expired(tokenholder) {
   try {
@@ -101,9 +84,58 @@ async function get_and_save_auth_token(tokenholder) {
     throw err;
   }
 }
-// type. Current options
-//Count- How many posts we will request until
-// Timeprev- unixtime period
+
+function check_request_count(proposed_requests) {
+  return proposed_requests < (1000 - get_request_count());
+}
+
+function get_request_count() {
+  return trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
+    return Number(current.split(':')[0]) + accumulator
+  }, 0);
+};
+
+function log_request_count(request_count) {
+  let log = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(','));
+  log.push(`${request_count}:${Date.now()}`)
+  writeFileSync('requestlog.txt', log.join(','));
+}
+
+function trim_request_log(log) {
+  return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
+}
+
+async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
+  try {
+    const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/about`, {
+      headers,
+    })
+    if (response.data.data.subreddit_type == undefined && response.data.data.over18 == undefined) {
+      subreddit_does_not_exist == true;
+      console.log("Subreddit Does Not Exist")
+    }
+    return response.data.data.subreddit_type == 'public' && !response.data.data.over18;
+  } catch (err) {
+    if (err.status == 400) {
+      console.log("Axios Bad request");
+      return false;
+    } else if (err.status == 401) {
+      console.log("Authorization Error");
+      return false;
+    } else if (err.status == 403) {
+      console.log("Private Subreddit")
+      subreddit_private = true;
+      return false;
+    } else if (err.status == 404) {
+      subreddit_does_not_exist = true;
+      return false;
+    } else {
+      console.log(err);
+      return false;
+    }
+  }
+}
+
 async function get_posts_until(headers, subreddit, data, count,) {
   let request_count = 0;
   //TODO, Manage requests better;
@@ -138,30 +170,18 @@ async function get_posts_until(headers, subreddit, data, count,) {
   console.log(data.length)
 }
 
-function check_request_count(proposed_requests) {
-  return proposed_requests < (1000 - get_request_count());
-}
-function get_request_count() {
-  return trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
-    return Number(current.split(':')[0]) + accumulator
-  }, 0);
-};
 
-function log_request_count(request_count) {
-  let log = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(','));
-  log.push(`${request_count}:${Date.now()}`)
-  writeFileSync('requestlog.txt', log.join(','));
-}
-
-function trim_request_log(log) {
-  return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
-}
 async function get_comment_trees(headers, subreddit, data) {
   const posts = [];
   const more_nodes_request_queue = [];
-  // Request comment tree for all posts, and append comments to the post.comments value.
+  // see if we have enough requests to get all the posts:
+  let request_budget = 1000 - get_request_count();
+  let request_count = 0;
+
   const postMap = new Map();
   for (const post of data) {
+    request_budget--;
+    request_count++;
     const postId = post.data.name;
     postMap.set(postId, post);
     posts.push(axios
@@ -173,19 +193,26 @@ async function get_comment_trees(headers, subreddit, data) {
       .catch((err) => {
         console.error(`Failed to load comments for post ${postId}`, err);
       }));
+    if (!request_budget) {
+      break;
+    }
   }
-
+  log_request_count(request_count);
+  request_count = 0;
   await Promise.all(posts);
 
   const commentMap = new Map();
 
   for (const post of data) {
-    process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue);
+    process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.id);
   }
 
-  while (more_nodes_request_queue.length > 0) {
+  while (more_nodes_request_queue.length && request_budget) {
+    request_budget--;
+    request_count++;
     const req = more_nodes_request_queue.shift();
     const { parentNode, childrenIds } = req;
+    // console.log(req)
     const url = `https://oauth.reddit.com/api/morechildren.json?link_id=t3_${req.postId}&children=${childrenIds.join(",")}`;
     try {
       const res = await axios.get(url, { headers });
@@ -217,10 +244,17 @@ async function get_comment_trees(headers, subreddit, data) {
           }
         }
       })
-    } catch {
-      console.log("error")
+    } catch (err) {
+      console.error("Error fetching morechildren:", {
+        url,
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+      });
     }
   }
+  log_request_count(request_count);
 }
 
 function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_nodes_request_queue, postId) {
@@ -244,6 +278,11 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
         queue.push(...node.data.replies.data.children);
       }
     } else if (node.kind === 'more') {
+      // console.log(node.data);
+      if (node.data.children.length == 0 || node.data.count == 0) {
+        //More node is just a placeholder in these cases
+        continue;
+      }
       more_nodes_request_queue.push({
         parentNode: node,   // direct reference
         postId: postId,     // passed in
@@ -255,6 +294,23 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
   }
 }
 
+function count_user_votes(data, user_likes) {
+  data.forEach((el, ind, arr) => {
+    if (user_likes[el.data.author] == undefined) {
+      user_likes[el.data.author] = {
+        post_count: 1,
+        num_comments: el.data.num_comments,
+        total_upvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
+        total_downvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
+      }
+    } else {
+      user_likes[el.data.author].post_count += 1;
+      user_likes[el.data.author].num_comments += el.data.num_comments;
+      user_likes[el.data.author].total_upvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.score == 0 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
+      user_likes[el.data.author].total_downvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
+    }
+  })
+}
 function convert_userinfo_csv(data) {
   const arr = ['author,post_count,num_comments,total_upvotes,total_downvotes'];
 
@@ -353,36 +409,7 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
   writeFileSync('wordreport.csv', str)
 }
 
-async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
-  try {
-    const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/about`, {
-      headers,
-    })
-    if (response.data.data.subreddit_type == undefined && response.data.data.over18 == undefined) {
-      subreddit_does_not_exist == true;
-      console.log("Subreddit Does Not Exist")
-    }
-    return response.data.data.subreddit_type == 'public' && !response.data.data.over18;
-  } catch (err) {
-    if (err.status == 400) {
-      console.log("Axios Bad request");
-      return false;
-    } else if (err.status == 401) {
-      console.log("Authorization Error");
-      return false;
-    } else if (err.status == 403) {
-      console.log("Private Subreddit")
-      subreddit_private = true;
-      return false;
-    } else if (err.status == 404) {
-      subreddit_does_not_exist = true;
-      return false;
-    } else {
-      console.log(err);
-      return false;
-    }
-  }
-}
+
 
 // https://oauth.reddit.com/r/${subreddit}/new
 
