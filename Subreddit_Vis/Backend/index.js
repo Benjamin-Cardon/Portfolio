@@ -105,13 +105,18 @@ async function get_and_save_auth_token(tokenholder) {
 //Count- How many posts we will request until
 // Timeprev- unixtime period
 async function get_posts_until(headers, subreddit, data, count,) {
+  let request_count = 0;
+  //TODO, Manage requests better;
+  if (!check_request_count(count / 100)) {
+    throw Error;
+  }
   const limit = 100;
   let after = null;
   const params = { limit };
-
   while (data.length < count) {
     try {
       if (after) params.after = after;
+      request_count++;
       const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
         headers, params
       })
@@ -129,9 +134,28 @@ async function get_posts_until(headers, subreddit, data, count,) {
   if (data.length > count) {
     data.length = count;
   }
+  log_request_count(request_count);
   console.log(data.length)
 }
 
+function check_request_count(proposed_requests) {
+  return proposed_requests < (1000 - get_request_count());
+}
+function get_request_count() {
+  return trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
+    return Number(current.split(':')[0]) + accumulator
+  }, 0);
+};
+
+function log_request_count(request_count) {
+  let log = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(','));
+  log.push(`${request_count}:${Date.now()}`)
+  writeFileSync('requestlog.txt', log.join(','));
+}
+
+function trim_request_log(log) {
+  return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
+}
 async function get_comment_trees(headers, subreddit, data) {
   const posts = [];
   const more_nodes_request_queue = [];
