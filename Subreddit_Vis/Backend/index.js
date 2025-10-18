@@ -9,29 +9,16 @@ transformersEnv.allowLocalModels = true;
 transformersEnv.localModelPath = path.resolve("./models");
 transformersEnv.allowRemoteModels = false;
 
-// const tokenizerPath = path.resolve("./models/cardiffnlp_roberta_onnx/tokenizer.json");
-
-// if (existsSync(tokenizerPath)) {
-//   const data = JSON.parse(readFileSync(tokenizerPath, "utf-8"));
-//   if (data.model?.merges && Array.isArray(data.model.merges[0]) && Array.isArray(data.model.merges[0])) {
-//     console.log("⚙️ Fixing merges format in tokenizer.json...");
-//     data.model.merges = data.model.merges.map(pair => pair.join(" "));
-//     writeFileSync(tokenizerPath, JSON.stringify(data, null, 2));
-//     console.log("✅ tokenizer.json fixed");
-//   }
-// }
-
 const sentiment = await pipeline(
   "sentiment-analysis",
   "cardiffnlp_roberta_onnx", { dtype: 'fp32', quantized: false }
 );
 
-
-// ---------- 2️⃣ EMBEDDING MODEL ----------
 const embeddings = await pipeline(
   "feature-extraction",
   "all-MiniLM-L6-v2-onnx", { dtype: 'fp32', quantized: false }
 );
+
 import winkNLP from 'wink-nlp';
 
 // Load English language model
@@ -65,11 +52,12 @@ async function main() {
   let data = [];
   await get_posts_until(headers, subreddit, data, 5)
   await get_comment_trees(headers, subreddit, data);
+
   // console.log(data[1].comments.map((x) => x.data))
   let user_likes = {}
-  count_user_votes(data, user_likes)
-  convert_userinfo_csv(user_likes)
-  word_frequency_sentiment_by_user(data, user_likes, {})
+  // count_user_votes(data, user_likes)
+  // convert_userinfo_csv(user_likes)
+  // word_frequency_sentiment_by_user(data, user_likes, {})
   //console.log(Object.entries(user_likes['___words___']).filter(([key, value]) => value.authors.length > 3).map(([key, value]) => `${key}: has authors ` + value.authors.join(',')))
 }
 
@@ -209,10 +197,13 @@ async function get_comment_trees(headers, subreddit, data) {
 
   const postMap = new Map();
   for (const post of data) {
-    request_budget--;
-    request_count++;
     const postId = post.data.name;
     postMap.set(postId, post);
+    if (!post.data.num_comments) {
+      continue;
+    }
+    request_budget--;
+    request_count++;
     posts.push(axios
       .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers })
       .then((res) => {
@@ -439,35 +430,60 @@ function word_frequency_sentiment_by_user(data, user_likes, words) {
   writeFileSync('wordreport.csv', str)
 }
 
+function calculate_metrics(data) {
+  const user_summaries = {};
+  const word_summaries = {};
+  const post_embedding_performance = {};
+  const subreddit_summary = {}
+  for (const post of data) {
+    const post_metrics = calculate_post_metrics(post);
+    const comment_metrics = calculate_comment_metrics(post.comments);
+    reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary);
+    reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary);
+  }
+  return { user_summaries, word_summaries, post_embedding_performance, subreddit_summary }
+}
 
+function calculate_post_metrics(post) {
+  const post_metrics = {};
+  post_metrics.num_comments = post.data.num_comments;
+  post_metrics.total_upvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
+  post_metrics.total_downvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
+  post_metrics.author = post.data.author;
+  const text = post.data.title + " " + post.data.selftext;
+  const doc = nlp.readDoc(text);
+  post_metrics.frequency_table = doc.tokens()
+    .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+    .out(its.lemma, as.freqTable);
+  post_metrics.sentiment = await sentiment(text);
+  post_metrics.id = post.data.id;
+  post_metrics.embeddings = embeddings(text);
+}
+function calculate_comment_metrics(comments) {
+  let comments_metrics = [];
+  for (const comment of comments) {
+    calculate_comment_metrics_tree_flatten(comment_metrics, comment)
+  }
+  return comments_metrics;
+}
+function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_id,) {
+  const comment_metrics = {};
+  comment_metrics.id = comment.data.id;
+  comment_metrics.post_id = post_id == undefined ? comment.data.parent_id : post_id;
+  comment_metrics.author = comment.data.author;
+  comment_metrics.embeddings = embeddings(comment.data.body)
+  comment_metrics.sentiment = sentiment(comment.data.body);
+  comment_metrics.frequency_table = nlp.readDoc(text).tokens()
+    .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+    .out(its.lemma, as.freqTable);
+  comment_metrics.replied_to = comment.data.parent_id;
+  comment_metrics.direct_reply_count = comment.data.replies.data.children.length;
+  comment_metrics.score = comment.data.score;
+  comment_metrics.upvotes = comment.data.ups;
+  comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
 
-// https://oauth.reddit.com/r/${subreddit}/new
-
-// read token.txt.
-// if the expiration date is later than now- we will request a new token.
-//  When we request the new token, we will..
-//  calculate a new expiration date- date now + time in seconds.
-//  overwrite the file with the new expirationdate and time in seconds.
-// else, we will retrieve the old token.
-// Notes on the API: When we request  at the current point, we're given the 25 most recent posts, with the ID of the post directly after them. We can use that ID to make multiple calls if we want to.
-//>>> submission = reddit.submission("nej10s")
-// >>> ratio = submission.upvote_ratio
-// >>> ups = round((ratio*submission.score)/(2*ratio - 1)) if ratio != 0.5 else round(submission.score/2)
-// >>> downs = ups - submission.score
-// >>> ups,downs
-// 2 1
-
-// let request_instance = axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
-//   headers
-// })
-// request_instance.then((response) => {
-//   const children = response.data.data.children
-//   console.log(children[children.length - 1])
-//   // let post_ID = response.data.data.children[0].data.id;
-//   // let commentTreeRequest = axios.get(`https://oauth.reddit.com/r/${subreddit}/comments/${post_ID}`, { headers })
-//   // commentTreeRequest.then((response) => {
-//   //   for (let i = 0; i < response.data.length; i++) {
-//   //     console.log(response.data[i]);
-//   //   }
-//   // })
-// })
+  comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comment_metrics, child, comment_metrics.post_id))
+  comments_metrics.push(comment_metrics);
+}
+function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary) { }
+function reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary) { }
