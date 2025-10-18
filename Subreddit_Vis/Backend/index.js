@@ -314,121 +314,121 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
   }
 }
 
-function count_user_votes(data, user_likes) {
-  data.forEach((el, ind, arr) => {
-    if (user_likes[el.data.author] == undefined) {
-      user_likes[el.data.author] = {
-        post_count: 1,
-        num_comments: el.data.num_comments,
-        total_upvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
-        total_downvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
-      }
-    } else {
-      user_likes[el.data.author].post_count += 1;
-      user_likes[el.data.author].num_comments += el.data.num_comments;
-      user_likes[el.data.author].total_upvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.score == 0 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
-      user_likes[el.data.author].total_downvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
-    }
-  })
-}
+// function count_user_votes(data, user_likes) {
+//   data.forEach((el, ind, arr) => {
+//     if (user_likes[el.data.author] == undefined) {
+//       user_likes[el.data.author] = {
+//         post_count: 1,
+//         num_comments: el.data.num_comments,
+//         total_upvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
+//         total_downvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
+//       }
+//     } else {
+//       user_likes[el.data.author].post_count += 1;
+//       user_likes[el.data.author].num_comments += el.data.num_comments;
+//       user_likes[el.data.author].total_upvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.score == 0 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
+//       user_likes[el.data.author].total_downvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
+//     }
+//   })
+// }
 
-function convert_userinfo_csv(data) {
-  const arr = ['author,post_count,num_comments,total_upvotes,total_downvotes'];
+// function convert_userinfo_csv(data) {
+//   const arr = ['author,post_count,num_comments,total_upvotes,total_downvotes'];
 
-  for (const [key, value] of Object.entries(data)) {
-    arr.push(key + ',' + value.post_count + ',' + value.num_comments + ',' + value.total_upvotes + ',' + value.total_downvotes)
-  }
-  const str = arr.join('\n')
-  writeFileSync('userreport.csv', str)
-}
+//   for (const [key, value] of Object.entries(data)) {
+//     arr.push(key + ',' + value.post_count + ',' + value.num_comments + ',' + value.total_upvotes + ',' + value.total_downvotes)
+//   }
+//   const str = arr.join('\n')
+//   writeFileSync('userreport.csv', str)
+// }
 
-function word_frequency_sentiment_by_user(data, user_likes, words) {
-  user_likes['___words___'] = {}
+// function word_frequency_sentiment_by_user(data, user_likes, words) {
+//   user_likes['___words___'] = {}
 
-  for (const post of data) {
-    let author = post.data.author;
-    const text = post.data.title + post.data.selftext;
-    const doc = nlp.readDoc(text);
-    const frequency_table = doc.tokens()
-      .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
-      .out(its.lemma, as.freqTable);
-    // console.log(frequency_table)
-    // console.log(doc.out(its.sentiment))
+//   for (const post of data) {
+//     let author = post.data.author;
+//     const text = post.data.title + post.data.selftext;
+//     const doc = nlp.readDoc(text);
+//     const frequency_table = doc.tokens()
+//       .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+//       .out(its.lemma, as.freqTable);
+//     // console.log(frequency_table)
+//     // console.log(doc.out(its.sentiment))
 
-    if (!user_likes[author]['___words___']) {
-      user_likes[author]['___words___'] = {};
-    }
+//     if (!user_likes[author]['___words___']) {
+//       user_likes[author]['___words___'] = {};
+//     }
 
-    for (const [word, frequency] of frequency_table) {
-      if (!words[word]) {
-        words[word] = {};
-        words[word]['count'] = frequency
-        words[word]['total_upvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
-        words[word]['total_downvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
-        words[word]['num_comments'] = post.data.num_comments;
-        words[word]['post_count'] = 1;
-        words[word]['positive_sent_freq'] = 0;
-        words[word]['neutral_sent_freq'] = 0;
-        words[word]['negative_sent_freq'] = 0;
-      } else {
-        words[word].count += frequency
-        words[word].total_upvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
-        words[word].total_downvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
-        words[word].num_comments += post.data.num_comments;
-        words[word].post_count += 1;
-      }
-      if (!user_likes['___words___'][word]) {
-        user_likes['___words___'][word] = { ...words[word], 'authors': [author] };
-      } else {
-        Object.entries(words[word]).forEach(([key, value]) => {
-          if (key != 'authors') {
-            user_likes['___words___'][word][key] += value;
-          }
-        })
-        if (!user_likes['___words___'][word].authors.includes(author)) {
-          user_likes['___words___'][word].authors.push(author);
-        }
-      }
+//     for (const [word, frequency] of frequency_table) {
+//       if (!words[word]) {
+//         words[word] = {};
+//         words[word]['count'] = frequency
+//         words[word]['total_upvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
+//         words[word]['total_downvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
+//         words[word]['num_comments'] = post.data.num_comments;
+//         words[word]['post_count'] = 1;
+//         words[word]['positive_sent_freq'] = 0;
+//         words[word]['neutral_sent_freq'] = 0;
+//         words[word]['negative_sent_freq'] = 0;
+//       } else {
+//         words[word].count += frequency
+//         words[word].total_upvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
+//         words[word].total_downvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
+//         words[word].num_comments += post.data.num_comments;
+//         words[word].post_count += 1;
+//       }
+//       if (!user_likes['___words___'][word]) {
+//         user_likes['___words___'][word] = { ...words[word], 'authors': [author] };
+//       } else {
+//         Object.entries(words[word]).forEach(([key, value]) => {
+//           if (key != 'authors') {
+//             user_likes['___words___'][word][key] += value;
+//           }
+//         })
+//         if (!user_likes['___words___'][word].authors.includes(author)) {
+//           user_likes['___words___'][word].authors.push(author);
+//         }
+//       }
 
-      if (!user_likes[author]['___words___'][word]) {
-        user_likes[author]['___words___'][word] = { ...words[word] }
-      } else {
-        Object.entries(words[word]).forEach(([key, value]) => {
-          user_likes[author]['___words___'][word] += value;
-        })
-      }
-    }
+//       if (!user_likes[author]['___words___'][word]) {
+//         user_likes[author]['___words___'][word] = { ...words[word] }
+//       } else {
+//         Object.entries(words[word]).forEach(([key, value]) => {
+//           user_likes[author]['___words___'][word] += value;
+//         })
+//       }
+//     }
 
 
-    const Sentiment_categorization_boundary = .3;
-    doc.sentences().each((sentence) => {
-      const sentiment = sentence.out(its.sentiment);
-      // console.log(`The following sentence is given a sentiment of ${sentiment}` + sentence.out())
-      const frequency_table = sentence.tokens()
-        .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
-        .out(its.lemma, as.freqTable);
+//     const Sentiment_categorization_boundary = .3;
+//     doc.sentences().each((sentence) => {
+//       const sentiment = sentence.out(its.sentiment);
+//       // console.log(`The following sentence is given a sentiment of ${sentiment}` + sentence.out())
+//       const frequency_table = sentence.tokens()
+//         .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+//         .out(its.lemma, as.freqTable);
 
-      for (const [word, frequency] of frequency_table) {
-        if (sentiment > Sentiment_categorization_boundary) {
-          words[word].positive_sent_freq += frequency;
-        } else if (sentiment < -Sentiment_categorization_boundary) {
-          words[word].negative_sent_freq += frequency;
-        } else {
-          words[word].neutral_sent_freq += frequency;
-        }
-      }
-    });
-  }
-  //console.log(words)
+//       for (const [word, frequency] of frequency_table) {
+//         if (sentiment > Sentiment_categorization_boundary) {
+//           words[word].positive_sent_freq += frequency;
+//         } else if (sentiment < -Sentiment_categorization_boundary) {
+//           words[word].negative_sent_freq += frequency;
+//         } else {
+//           words[word].neutral_sent_freq += frequency;
+//         }
+//       }
+//     });
+//   }
+//console.log(words)
 
-  const arr = ['word, frequency, post_count,total_upvotes,total_downvotes,comments,neg_sent_freq,pos_sent_freq,neu_sent_freq'];
+// const arr = ['word, frequency, post_count,total_upvotes,total_downvotes,comments,neg_sent_freq,pos_sent_freq,neu_sent_freq'];
 
-  for (const [key, value] of Object.entries(words)) {
-    arr.push(key + ',' + value.count + ',' + value.post_count + ',' + value.total_upvotes + ',' + value.total_downvotes + ',' + value.num_comments + ',' + value.negative_sent_freq + ',' + value.positive_sent_freq + ',' + value.neutral_sent_freq)
-  }
-  const str = arr.join('\n')
-  writeFileSync('wordreport.csv', str)
-}
+// for (const [key, value] of Object.entries(words)) {
+//   arr.push(key + ',' + value.count + ',' + value.post_count + ',' + value.total_upvotes + ',' + value.total_downvotes + ',' + value.num_comments + ',' + value.negative_sent_freq + ',' + value.positive_sent_freq + ',' + value.neutral_sent_freq)
+// }
+// const str = arr.join('\n')
+// writeFileSync('wordreport.csv', str)
+// }
 
 function calculate_metrics(data) {
   const user_summaries = {};
@@ -438,8 +438,8 @@ function calculate_metrics(data) {
   for (const post of data) {
     const post_metrics = calculate_post_metrics(post);
     const comment_metrics = calculate_comment_metrics(post.comments);
-    reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary);
-    reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary);
+    reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance);
+    reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance);
   }
   return { user_summaries, word_summaries, post_embedding_performance, subreddit_summary }
 }
@@ -450,15 +450,18 @@ function calculate_post_metrics(post) {
   post_metrics.total_upvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
   post_metrics.total_downvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
   post_metrics.author = post.data.author;
+  post_metrics.author_id = post.data.author_fullname;
   const text = post.data.title + " " + post.data.selftext;
   const doc = nlp.readDoc(text);
   post_metrics.frequency_table = doc.tokens()
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
     .out(its.lemma, as.freqTable);
+  //TODO - Chunk Texts.
   post_metrics.sentiment = await sentiment(text);
   post_metrics.id = post.data.id;
   post_metrics.embeddings = embeddings(text);
 }
+
 function calculate_comment_metrics(comments) {
   let comments_metrics = [];
   for (const comment of comments) {
@@ -466,11 +469,13 @@ function calculate_comment_metrics(comments) {
   }
   return comments_metrics;
 }
+
 function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_id,) {
   const comment_metrics = {};
   comment_metrics.id = comment.data.id;
   comment_metrics.post_id = post_id == undefined ? comment.data.parent_id : post_id;
   comment_metrics.author = comment.data.author;
+  comment_metrics.author_id = comment.data.author_fullname;
   comment_metrics.embeddings = embeddings(comment.data.body)
   comment_metrics.sentiment = sentiment(comment.data.body);
   comment_metrics.frequency_table = nlp.readDoc(text).tokens()
@@ -485,5 +490,97 @@ function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_
   comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comment_metrics, child, comment_metrics.post_id))
   comments_metrics.push(comment_metrics);
 }
-function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary) { }
-function reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary) { }
+function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance) {
+  // Reduce user Summaries
+  const author_id = post_metrics.author_id
+  let user;
+  if (!user_summaries[author_id]) {
+    user = {
+      post_count: 1,
+      author: post_metrics.author,
+      author_id: post_metrics.author_id,
+      total_upvotes: post_metrics.total_upvotes,
+      estimated_downvotes: post_metrics.total_downvotes,
+      post_embeddings: [post_metrics.embeddings],
+      users_replied_to: [],
+      users_who_commented_on_own_post: [],
+      users_whose_posts_were_commented_on: [],
+      users_who_replied_to: [],
+      words: {},
+      post_count: 1,
+      reply_count: 0,
+      total_comments_on_posts: post_metrics.num_comments;
+      negative_sentiment_texts: 0;
+      positive_sentiment_texts: 0;
+      neutral_sentiment_texts: 0;
+    };
+    user_summaries[author_id] = user;
+  } else {
+    user = user_summaries[author_id];
+    user.post_count++;
+    user.total_upvotes += post_metrics.total_upvotes;
+    user.estimated_downvotes += post_metrics.total_downvotes;
+    user.post_embeddings.push(post_metrics.embeddings);
+    total_comments_on_posts += post_metrics.num_comments;
+  }
+  switch (post_metrics.sentiment[0].label) {
+    case 'POSITIVE':
+      user.positive_sentiment_texts++;
+      break;
+    case: 'NEGATIVE':
+      user.negative_sentiment_texts++;
+      break;
+    case: 'NEUTRAL':
+      user.neutral_sentiment_texts++;
+      break;
+  }
+
+  for (word of post_metrics.frequency_table) {
+    let this_word;
+    if (!user.words[word[0]]) {
+      this_word = {
+        unique_posts: 1,
+        frequency: word[1],
+        negative_sentiment_freq: 0,
+        positive_sentiment_freq: 0,
+        neutral_sentiment_freq: 0,
+      }
+      user.words[word[0]] = this_word;
+    } else {
+      this_word = user.words[word[0]]
+    }
+
+    let global_word;
+    if (!word_summaries[word[0]]) {
+      global_word = { ...this_word, users: [post_metrics.author_id] };
+      word_summaries[word[0]] = global_word;
+    } else {
+      global_word = word_summaries[word[0]];
+      global_word.frequency += this_word.frequency;
+      global_word.unique_posts++;
+      global_word.users.push(post_metrics.author_id);
+    }
+    switch (post_metrics.sentiment[0].label) {
+      case 'POSITIVE':
+        this_word.positive_sentiment_freq += word[1];
+        global_word.positive_sentiment_freq += word[1];
+        break;
+      case: 'NEGATIVE':
+        this_word.negative_sentiment_freq += word[1];
+        global_word.negative_sentiment_freq += word[1];
+        break;
+      case: 'NEUTRAL':
+        this_word.neutral_sentiment_freq += word[1];
+        global_word.neutral_sentiment_freq += word[1];
+        break;
+    }
+  }
+  if (!post_embedding_performance.embeddings) {
+    post_embedding_performance.post_data = [{ embedding: post_metrics.embeddings, num_comments: post_metrics.num_comments, total_upvotes: post_metrics.num_comments, total_downvotes: num_comments.estimated_downvotes, }];
+  } else {
+    post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, num_comments: post_metrics.num_comments, total_upvotes: post_metrics.num_comments, total_downvotes: num_comments.estimated_downvotes, })
+  }
+}
+function reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary) {
+
+}
