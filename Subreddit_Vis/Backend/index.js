@@ -1,7 +1,37 @@
 import axios from "axios";
-import 'dotenv/config';
-import { readFileSync, writeFileSync } from "fs";
-// Load wink-nlp package
+import path from "path";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { pipeline, env as transformersEnv } from "@xenova/transformers";
+import dotenv from "dotenv";
+dotenv.config(); // load .env file
+
+transformersEnv.allowLocalModels = true;
+transformersEnv.localModelPath = path.resolve("./models");
+transformersEnv.allowRemoteModels = false;
+
+// const tokenizerPath = path.resolve("./models/cardiffnlp_roberta_onnx/tokenizer.json");
+
+// if (existsSync(tokenizerPath)) {
+//   const data = JSON.parse(readFileSync(tokenizerPath, "utf-8"));
+//   if (data.model?.merges && Array.isArray(data.model.merges[0]) && Array.isArray(data.model.merges[0])) {
+//     console.log("⚙️ Fixing merges format in tokenizer.json...");
+//     data.model.merges = data.model.merges.map(pair => pair.join(" "));
+//     writeFileSync(tokenizerPath, JSON.stringify(data, null, 2));
+//     console.log("✅ tokenizer.json fixed");
+//   }
+// }
+
+const sentiment = await pipeline(
+  "sentiment-analysis",
+  "cardiffnlp_roberta_onnx", { dtype: 'fp32', quantized: false }
+);
+
+
+// ---------- 2️⃣ EMBEDDING MODEL ----------
+const embeddings = await pipeline(
+  "feature-extraction",
+  "all-MiniLM-L6-v2-onnx", { dtype: 'fp32', quantized: false }
+);
 import winkNLP from 'wink-nlp';
 
 // Load English language model
@@ -33,7 +63,7 @@ async function main() {
   console.log("acceptable subreddit")
 
   let data = [];
-  await get_posts_until(headers, subreddit, data, 950)
+  await get_posts_until(headers, subreddit, data, 5)
   await get_comment_trees(headers, subreddit, data);
   // console.log(data[1].comments.map((x) => x.data))
   let user_likes = {}
@@ -169,7 +199,6 @@ async function get_posts_until(headers, subreddit, data, count,) {
   log_request_count(request_count);
   console.log(data.length)
 }
-
 
 async function get_comment_trees(headers, subreddit, data) {
   const posts = [];
@@ -311,6 +340,7 @@ function count_user_votes(data, user_likes) {
     }
   })
 }
+
 function convert_userinfo_csv(data) {
   const arr = ['author,post_count,num_comments,total_upvotes,total_downvotes'];
 

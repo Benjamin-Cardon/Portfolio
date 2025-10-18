@@ -12,6 +12,8 @@
     "dev": "node Frontend/esbuild.config.js --watch & live-server Frontend/dist --port=3000"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.7.5",
+    "@xenova/transformers": "^2.17.2",
     "axios": "^1.11.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
