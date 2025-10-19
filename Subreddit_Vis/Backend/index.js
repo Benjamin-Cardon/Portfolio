@@ -51,7 +51,9 @@ async function main() {
 
   let data = [];
   await get_posts_until(headers, subreddit, data, 5)
-  await get_comment_trees(headers, subreddit, data);
+  let postMap = Map();
+  let commentMap = Map();
+  await get_comment_trees(headers, subreddit, data, postMap, commentMap);
 
   // console.log(data[1].comments.map((x) => x.data))
   let user_likes = {}
@@ -188,14 +190,13 @@ async function get_posts_until(headers, subreddit, data, count,) {
   console.log(data.length)
 }
 
-async function get_comment_trees(headers, subreddit, data) {
+async function get_comment_trees(headers, subreddit, data, postMap, commentMap) {
   const posts = [];
   const more_nodes_request_queue = [];
   // see if we have enough requests to get all the posts:
   let request_budget = 1000 - get_request_count();
   let request_count = 0;
 
-  const postMap = new Map();
   for (const post of data) {
     const postId = post.data.name;
     postMap.set(postId, post);
@@ -221,7 +222,6 @@ async function get_comment_trees(headers, subreddit, data) {
   request_count = 0;
   await Promise.all(posts);
 
-  const commentMap = new Map();
 
   for (const post of data) {
     process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.id);
@@ -430,25 +430,26 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
 // writeFileSync('wordreport.csv', str)
 // }
 
-function calculate_metrics(data) {
+async function calculate_metrics(data, postMap, commentMap) {
   const user_summaries = {};
   const word_summaries = {};
   const post_embedding_performance = {};
   const subreddit_summary = {}
   for (const post of data) {
-    const post_metrics = calculate_post_metrics(post);
-    const comment_metrics = calculate_comment_metrics(post.comments);
+    const post_metrics = await calculate_post_metrics(post);
+    const comments_metrics = await calculate_comments_metrics(post.comments);
     reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance);
-    reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance);
+    reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap);
   }
   return { user_summaries, word_summaries, post_embedding_performance, subreddit_summary }
 }
 
-function calculate_post_metrics(post) {
+async function calculate_post_metrics(post) {
   const post_metrics = {};
   post_metrics.num_comments = post.data.num_comments;
-  post_metrics.total_upvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
-  post_metrics.total_downvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
+  post_metrics.total_direct_replies = post.comments.length;
+  post_metrics.total_upvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.upvote_ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
+  post_metrics.total_downvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.upvote_ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
   post_metrics.author = post.data.author;
   post_metrics.author_id = post.data.author_fullname;
   const text = post.data.title + " " + post.data.selftext;
@@ -459,25 +460,27 @@ function calculate_post_metrics(post) {
   //TODO - Chunk Texts.
   post_metrics.sentiment = await sentiment(text);
   post_metrics.id = post.data.id;
-  post_metrics.embeddings = embeddings(text);
+  post_metrics.embeddings = await embeddings(text);
+  return post_metrics;
 }
 
-function calculate_comment_metrics(comments) {
+function calculate_comments_metrics(comments) {
   let comments_metrics = [];
   for (const comment of comments) {
-    calculate_comment_metrics_tree_flatten(comment_metrics, comment)
+    calculate_comment_metrics_tree_flatten(comments_metrics, comment)
   }
   return comments_metrics;
 }
 
-function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_id,) {
+async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_id,) {
   const comment_metrics = {};
+  const text = comment.data.body;
   comment_metrics.id = comment.data.id;
   comment_metrics.post_id = post_id == undefined ? comment.data.parent_id : post_id;
   comment_metrics.author = comment.data.author;
   comment_metrics.author_id = comment.data.author_fullname;
-  comment_metrics.embeddings = embeddings(comment.data.body)
-  comment_metrics.sentiment = sentiment(comment.data.body);
+  comment_metrics.embeddings = await embeddings(comment.data.body)
+  comment_metrics.sentiment = await sentiment(comment.data.body);
   comment_metrics.frequency_table = nlp.readDoc(text).tokens()
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
     .out(its.lemma, as.freqTable);
@@ -485,9 +488,10 @@ function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_
   comment_metrics.direct_reply_count = comment.data.replies.data.children.length;
   comment_metrics.score = comment.data.score;
   comment_metrics.upvotes = comment.data.ups;
+  comment_metrics.total_downvotes = comment.data.ups - comment.data.score
   comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
 
-  comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comment_metrics, child, comment_metrics.post_id))
+  comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id))
   comments_metrics.push(comment_metrics);
 }
 function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance) {
@@ -501,18 +505,24 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
       author_id: post_metrics.author_id,
       total_upvotes: post_metrics.total_upvotes,
       estimated_downvotes: post_metrics.total_downvotes,
-      post_embeddings: [post_metrics.embeddings],
+      text_embeddings: [post_metrics.embeddings],
       users_replied_to: [],
       users_who_commented_on_own_post: [],
       users_whose_posts_were_commented_on: [],
       users_who_replied_to: [],
       words: {},
-      post_count: 1,
       reply_count: 0,
-      total_comments_on_posts: post_metrics.num_comments;
-      negative_sentiment_texts: 0;
-      positive_sentiment_texts: 0;
-      neutral_sentiment_texts: 0;
+      total_comments_on_posts: post_metrics.num_comments,
+      total_direct_replies: 0,
+      negative_sentiment_texts: 0,
+      positive_sentiment_texts: 0,
+      neutral_sentiment_texts: 0,
+      positive_replies: 0,
+      neutral_replies: 0,
+      negative_replies: 0,
+      positive_comments: 0,
+      negative_comments: 0,
+      neutral_comments: 0
     };
     user_summaries[author_id] = user;
   } else {
@@ -520,26 +530,26 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     user.post_count++;
     user.total_upvotes += post_metrics.total_upvotes;
     user.estimated_downvotes += post_metrics.total_downvotes;
-    user.post_embeddings.push(post_metrics.embeddings);
+    user.text_embeddings.push(post_metrics.embeddings);
     total_comments_on_posts += post_metrics.num_comments;
   }
   switch (post_metrics.sentiment[0].label) {
     case 'POSITIVE':
       user.positive_sentiment_texts++;
       break;
-    case: 'NEGATIVE':
+    case 'NEGATIVE':
       user.negative_sentiment_texts++;
       break;
-    case: 'NEUTRAL':
+    case 'NEUTRAL':
       user.neutral_sentiment_texts++;
       break;
   }
 
-  for (word of post_metrics.frequency_table) {
+  for (const word of post_metrics.frequency_table) {
     let this_word;
     if (!user.words[word[0]]) {
       this_word = {
-        unique_posts: 1,
+        unique_texts: 1,
         frequency: word[1],
         negative_sentiment_freq: 0,
         positive_sentiment_freq: 0,
@@ -547,7 +557,9 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
       }
       user.words[word[0]] = this_word;
     } else {
-      this_word = user.words[word[0]]
+      this_word = user.words[word[0]];
+      this_word.unique_texts++;
+      this_word.frequency += [word[1]];
     }
 
     let global_word;
@@ -557,7 +569,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     } else {
       global_word = word_summaries[word[0]];
       global_word.frequency += this_word.frequency;
-      global_word.unique_posts++;
+      global_word.unique_texts++;
       global_word.users.push(post_metrics.author_id);
     }
     switch (post_metrics.sentiment[0].label) {
@@ -565,22 +577,135 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
         this_word.positive_sentiment_freq += word[1];
         global_word.positive_sentiment_freq += word[1];
         break;
-      case: 'NEGATIVE':
+      case 'NEGATIVE':
         this_word.negative_sentiment_freq += word[1];
         global_word.negative_sentiment_freq += word[1];
         break;
-      case: 'NEUTRAL':
+      case 'NEUTRAL':
         this_word.neutral_sentiment_freq += word[1];
         global_word.neutral_sentiment_freq += word[1];
         break;
     }
   }
   if (!post_embedding_performance.embeddings) {
-    post_embedding_performance.post_data = [{ embedding: post_metrics.embeddings, num_comments: post_metrics.num_comments, total_upvotes: post_metrics.num_comments, total_downvotes: num_comments.estimated_downvotes, }];
+    post_embedding_performance.post_data = [{ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: num_comments.estimated_downvotes, }];
   } else {
-    post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, num_comments: post_metrics.num_comments, total_upvotes: post_metrics.num_comments, total_downvotes: num_comments.estimated_downvotes, })
+    post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: num_comments.estimated_downvotes, })
   }
 }
-function reduce_comments(comment_metrics, user_summaries, word_summaries, post_embedding_performance, subreddit_summary) {
+function reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap) {
+  for (const comment of comments_metrics) {
+    // User summaries
+    let user;
+    if (!user_summaries[comment.author_id]) {
+      user = {
+        post_count: 0,
+        author: comment.author,
+        author_id: comment.author_id,
+        total_upvotes: comment.total_upvotes,
+        estimated_downvotes: comment.total_downvotes,
+        text_embeddings: [comment.embeddings],
+        users_replied_to: [],
+        users_who_commented_on_own_post: [],
+        users_whose_posts_were_commented_on: [],
+        users_who_replied_to: [],
+        words: {},
+        reply_count: 1,
+        total_comments_on_posts: 0,
+        total_direct_replies: 0,
+        negative_sentiment_texts: 0,
+        positive_sentiment_texts: 0,
+        neutral_sentiment_texts: 0,
+        negative_replies: 0,
+        positive_replies: 0,
+        neutral_replies: 0,
+        positive_comments: 0,
+        negative_comments: 0,
+        neutral_comments: 0
+      };
+      user_summaries[author_id] = user;
+    } else {
+      user = user_summaries[author_id];
+      user.reply_count++;
+      user.text_embeddings.push(comment.embeddings);
+      user.total_upvotes += comment.total_upvotes;
+      user.estimated_downvotes += comment.total_downvotes
+    }
 
+    const parent_post = postMap.get(comment.post_id);
+    let direct_parent;
+    if (comment.parent_id.slice(0, 3) == 't1') {
+      direct_parent = commentMap.get(comment.parent_id);
+    } else {
+      direct_parent = postMap.get(comment.parent_id);
+    }
+    const parent_post_user = user_summaries[parent_post.data.author_fullname];
+    const direct_parent_user = user_summaries[direct_parent.data.author_fullname];
+    user.users_replied_to.push(direct_parent_user);
+    user.users_whose_posts_were_commented_on.push(parent_post_user);
+    parent_post_user.users_who_commented_on_own_post.push(user.author_id)
+    direct_parent_user.users_who_replied_to.push(user.author_id)
+
+    switch (comment.sentiment[0].label) {
+      case 'POSITIVE':
+        user.positive_sentiment_texts++;
+        direct_parent_user.positive_replies++;
+        parent_post_user.positive_comments++;
+        break;
+      case 'NEGATIVE':
+        user.negative_sentiment_texts++;
+        direct_parent_user.negative_replies++;
+        parent_post_user.negative_comments++;
+        break;
+      case 'NEUTRAL':
+        user.neutral_sentiment_texts++;
+        direct_parent_user.neutral_replies++;
+        parent_post_user.neutral_comments++;
+        break;
+    }
+
+    for (const word of comment.frequency_table) {
+      let this_word;
+      if (!user.words[word[0]]) {
+        this_word = {
+          unique_texts: 1,
+          frequency: word[1],
+          negative_sentiment_freq: 0,
+          positive_sentiment_freq: 0,
+          neutral_sentiment_freq: 0,
+        }
+        user.words[word[0]] = this_word;
+      } else {
+        this_word = user.words[word[0]];
+        this_word.unique_texts++;
+        this_word.frequenct += word[1];
+      }
+
+      let global_word;
+      if (!word_summaries[word[0]]) {
+        global_word = { ...this_word, users: [comment.author_id] };
+        word_summaries[word[0]] = global_word;
+      } else {
+        global_word = word_summaries[word[0]];
+        global_word.frequency += this_word.frequency;
+        global_word.unique_texts++;
+        global_word.users.push(comment.author_id);
+      }
+      switch (post_metrics.sentiment[0].label) {
+        case 'POSITIVE':
+          this_word.positive_sentiment_freq += word[1];
+          global_word.positive_sentiment_freq += word[1];
+          break;
+        case 'NEGATIVE':
+          this_word.negative_sentiment_freq += word[1];
+          global_word.negative_sentiment_freq += word[1];
+          break;
+        case 'NEUTRAL':
+          this_word.neutral_sentiment_freq += word[1];
+          global_word.neutral_sentiment_freq += word[1];
+          break;
+      }
+    }
+    post_embedding_performance.post_data.push({ embedding: comment.embeddings, num_comments: comment.num_comments, total_upvotes: comment.num_comments, total_downvotes: comment.estimated_downvotes, });
+  }
 }
