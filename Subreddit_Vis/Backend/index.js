@@ -50,11 +50,12 @@ async function main() {
   console.log("acceptable subreddit")
 
   let data = [];
-  await get_posts_until(headers, subreddit, data, 5)
-  let postMap = Map();
-  let commentMap = Map();
+  await get_posts_until(headers, subreddit, data, 10)
+  let postMap = new Map();
+  let commentMap = new Map();
   await get_comment_trees(headers, subreddit, data, postMap, commentMap);
-
+  const metrics = await calculate_metrics(data, postMap, commentMap);
+  console.log(metrics);
   // console.log(data[1].comments.map((x) => x.data))
   let user_likes = {}
   // count_user_votes(data, user_likes)
@@ -458,7 +459,7 @@ async function calculate_post_metrics(post) {
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
     .out(its.lemma, as.freqTable);
   //TODO - Chunk Texts.
-  post_metrics.sentiment = await sentiment(text);
+  post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
   post_metrics.id = post.data.id;
   post_metrics.embeddings = await embeddings(text);
   return post_metrics;
@@ -480,7 +481,7 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   comment_metrics.author = comment.data.author;
   comment_metrics.author_id = comment.data.author_fullname;
   comment_metrics.embeddings = await embeddings(comment.data.body)
-  comment_metrics.sentiment = await sentiment(comment.data.body);
+  comment_metrics.sentiment = await sentiment_chunker_and_aggregator(comment.data.body);
   comment_metrics.frequency_table = nlp.readDoc(text).tokens()
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
     .out(its.lemma, as.freqTable);
@@ -533,7 +534,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     user.text_embeddings.push(post_metrics.embeddings);
     total_comments_on_posts += post_metrics.num_comments;
   }
-  switch (post_metrics.sentiment[0].label) {
+  switch (post_metrics.sentiment.label) {
     case 'POSITIVE':
       user.positive_sentiment_texts++;
       break;
@@ -572,7 +573,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
       global_word.unique_texts++;
       global_word.users.push(post_metrics.author_id);
     }
-    switch (post_metrics.sentiment[0].label) {
+    switch (post_metrics.sentiment.label) {
       case 'POSITIVE':
         this_word.positive_sentiment_freq += word[1];
         global_word.positive_sentiment_freq += word[1];
@@ -588,9 +589,9 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     }
   }
   if (!post_embedding_performance.embeddings) {
-    post_embedding_performance.post_data = [{ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: num_comments.estimated_downvotes, }];
+    post_embedding_performance.post_data = [{ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, }];
   } else {
-    post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: num_comments.estimated_downvotes, })
+    post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, })
   }
 }
 function reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap) {
@@ -646,7 +647,7 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
     parent_post_user.users_who_commented_on_own_post.push(user.author_id)
     direct_parent_user.users_who_replied_to.push(user.author_id)
 
-    switch (comment.sentiment[0].label) {
+    switch (comment.sentiment.label) {
       case 'POSITIVE':
         user.positive_sentiment_texts++;
         direct_parent_user.positive_replies++;
@@ -691,7 +692,7 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
         global_word.unique_texts++;
         global_word.users.push(comment.author_id);
       }
-      switch (post_metrics.sentiment[0].label) {
+      switch (post_metrics.sentiment.label) {
         case 'POSITIVE':
           this_word.positive_sentiment_freq += word[1];
           global_word.positive_sentiment_freq += word[1];
@@ -708,4 +709,118 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
     }
     post_embedding_performance.post_data.push({ embedding: comment.embeddings, num_comments: comment.num_comments, total_upvotes: comment.num_comments, total_downvotes: comment.estimated_downvotes, });
   }
+}
+async function sentiment_chunker_and_aggregator(text) {
+  // if the text is less than 512 characters long, there is no need to chunk it.
+  const chunks = chunk_text(text);
+  const chunk_promises = chunks.map(async (chunk) => {
+    let labels = await sentiment(chunk, { topk: null });
+    return {
+      weight: text.length / chunk.length,
+      labels
+    }
+  })
+  const labels_and_weights = await Promise.all(chunk_promises);
+  return labels_and_weights.reduce((acc, curr) => {
+    acc[0].score += curr.labels[0].score * curr.weight;
+    acc[1].score += curr.labels[1].score * curr.weight;
+    acc[2].score += curr.labels[2].score * curr.weight;
+    return acc;
+  }, [{ label: 'NEGATIVE', score: 0 }, { label: 'NEUTRAL', score: 0 }, { label: "POSITIVE", score: 0 },]).reduce((acc, curr) => {
+    if (curr.score >= acc.score) {
+      return curr;
+    } else {
+      return acc;
+    }
+  }, { label: '', score: 0 });
+}
+function chunk_text(text) {
+  const chunks = []
+  if (text.length < 512) {
+    chunks.push(text);
+    return chunks;
+  }
+
+  const paragraphs = text.split(/\n\s*\n/);
+
+  for (const paragraph of paragraphs) {
+    chunks.push(...chunk_paragraph(paragraph));
+  }
+  return chunks;
+}
+
+function chunk_paragraph(paragraph) {
+  const paragraph_chunks = [];
+  if (paragraph.length < 512) {
+    paragraph_chunks.push(paragraph);
+    return paragraph_chunks
+  }
+  const sentences = nlp.readDoc(paragraph.trim()).doc.sentences().out();
+  paragraph_chunks.push(...chunk_sentences(sentences))
+  return paragraph_chunks;
+}
+
+function chunk_sentences(sentences) {
+  const chunks = [];
+  let current_chunk = '';
+  for (let sentence of sentences) {
+    if (sentence.length > 512) {
+      if (currentChunk) {
+        chunks.push(currentChunk.trim());
+        currentChunk = '';
+      }
+      chunks.push(...chunk_long_sentence(sentence.trim()))
+      continue;
+    }
+    if ((currentChunk + ' ' + sent).trim().length <= MAX_CHARS) {
+      currentChunk += (currentChunk ? ' ' : '') + sent;
+    } else {
+      chunks.push(currentChunk.trim());
+      currentChunk = sent;
+    }
+    if (currentChunk) chunks.push(currentChunk.trim());
+    return chunks;
+  }
+}
+
+function chunk_long_sentence(long_sentence) {
+  function chunkLongSentence(sentence) {
+    const words = nlp.readDoc(sentence).tokens().out();
+    const chunks = [];
+    let currentChunk = '';
+
+    for (const word of words) {
+      if (word.length > MAX_CHARS) {
+        // extreme case: a single word longer than limit
+        if (currentChunk) {
+          chunks.push(currentChunk.trim());
+          currentChunk = '';
+        }
+        chunks.push(...chunk_incoherently_long_string(word));
+        continue;
+      }
+
+      if ((currentChunk + ' ' + word).trim().length <= MAX_CHARS) {
+        currentChunk += (currentChunk ? ' ' : '') + word;
+      } else {
+        chunks.push(currentChunk.trim());
+        currentChunk = word;
+      }
+    }
+
+    if (currentChunk) chunks.push(currentChunk.trim());
+    return chunks;
+  }
+}
+
+function chunk_incoherently_long_string(incoherently_long_string) {
+  const numParts = Math.ceil(word.length / MAX_CHARS);
+  const partSize = Math.ceil(word.length / numParts);
+  const parts = [];
+
+  for (let i = 0; i < word.length; i += partSize) {
+    parts.push(word.slice(i, i + partSize));
+  }
+
+  return parts;
 }
