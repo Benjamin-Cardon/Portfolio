@@ -162,6 +162,9 @@ async function main(config) {
   const metrics = await calculate_metrics(data, postMap, commentMap);
 }
 
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
 
 function check_request_count(proposed_requests) {
   return proposed_requests < (get_request_rates().requests_remaining);
@@ -198,15 +201,23 @@ function trim_request_log(log) {
 async function get_posts_until(data, config,) {
 
   let request_count = 0;
-  //TODO, Manage requests better;
-  if (!config.mode === 'count' && check_request_count(config.postLimit / 100)) {
-    throw Error;
-  }
-
   const limit = 100;
   let after = null;
   const params = { limit };
-  while (data.length < count) {
+
+  while (data.length < config.postLimit) {
+    const { requests_remaining, ms_remaining } = get_request_count();
+
+    if (requests_remaining) {
+      console.log("There are currently no requests available.")
+      if ((config.mode === 'count' && config.burst_mode === 'sleep') || config.mode === 'full') {
+        console.log(`Waiting ${ms_remaining / 60000} minutes until beginning requests`);
+        await sleep(ms_remaining);
+      }
+    } else {
+      console.log(`Exiting early becuase of request counting error. After ${ms_remaining / 60000} minutes more requests will be available. `)
+      process.exit(1);
+    }
     try {
       if (after) params.after = after;
       request_count++;
@@ -218,7 +229,19 @@ async function get_posts_until(data, config,) {
       data.push(...children)
       after = response.data.data.after;
       if (!after) break;
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (config.isFull) {
+        if (request_count % 50 == 0) {
+          log_request_count(request_count)
+          request_count = 0;
+        }
+        await sleep((ms_remaining / requests_remaining ?? 1));
+      }
+      if (requests_remaining == request_count && config.isCount && config.burst_mode === 'sleep') {
+        log_request_count(request_count);
+        request_count = 0;
+        console.log("Ran out of requests, sleeping until more requests available")
+        await sleep(ms_remaining);
+      }
     } catch (err) {
       console.error("error fetching posts:", err.message)
       break;
@@ -227,7 +250,11 @@ async function get_posts_until(data, config,) {
   if (data.length > count) {
     data.length = count;
   }
-  log_request_count(request_count);
+  if (config.isFull) {
+    log_request_count(request_count % 50)
+  } else {
+    log_request_count(request_count);
+  }
   console.log(data.length)
 }
 
