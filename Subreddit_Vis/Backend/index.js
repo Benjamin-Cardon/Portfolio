@@ -3,6 +3,7 @@ import path from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { pipeline, env as transformersEnv } from "@xenova/transformers";
 import dotenv from "dotenv";
+import process from 'node:process'
 dotenv.config(); // load .env file
 
 transformersEnv.allowLocalModels = true;
@@ -26,44 +27,58 @@ import model from 'wink-eng-lite-web-model';
 
 // Get token
 const nlp = winkNLP(model, ['sbd', 'negation', 'sentiment', 'ner', 'pos']);
-// Obtain "its" helper to extract item properties.
 const its = nlp.its;
-// Obtain "as" reducer helper to reduce a collection.
 const as = nlp.as;
 
-
-main();
-
-async function main() {
-  let tokenholder = { token: "" };
-  await check_auth_token_expired(tokenholder);
-
-  let subreddit = 'dataengineering';
-  const headers = {
-    "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)", Authorization: `Bearer ${tokenholder.token}`,
+const mode = process.argv[2]
+if (!(mode == 'count' || mode == 'full')) {
+  console.error('please specify mode of either "count" or "full" ');
+  process.exit(1);
+}
+const subreddit = process.argv[3] || 'dataengineering';
+const count = Number(process.argv[4]) || 10;
+if (mode === 'count' && (isNaN(count) || count <= 0)) {
+  console.error('In count mode, please specify a positive numeric count.');
+  process.exit(1);
+}
+const isCount = mode == 'count'
+const isFull = mode == 'full';
+let burst_mode = '';
+if (isCount) {
+  burst_mode = process.argv[4] || 'end';
+  if (burst_mode != 'end' && burst_mode != 'sleep') {
+    console.log("incorrect or no burst mode included. Defaulting to 'end' mode. In end mode, the process will end after it hits it's reddit API request limit, even if more posts or comments are available to request");
+    burst_mode = 'sleep';
   }
-
-  if (! await check_subreddit_public_sfw_exists(headers, subreddit)) {
-    console.log("This is not a public, sfw subreddit!");
-    return;
-  }
-  console.log("acceptable subreddit")
-
-  let data = [];
-  await get_posts_until(headers, subreddit, data, 10)
-  let postMap = new Map();
-  let commentMap = new Map();
-  await get_comment_trees(headers, subreddit, data, postMap, commentMap);
-  const metrics = await calculate_metrics(data, postMap, commentMap);
-  console.log(metrics);
-  // console.log(data[1].comments.map((x) => x.data))
-  let user_likes = {}
-  // count_user_votes(data, user_likes)
-  // convert_userinfo_csv(user_likes)
-  // word_frequency_sentiment_by_user(data, user_likes, {})
-  //console.log(Object.entries(user_likes['___words___']).filter(([key, value]) => value.authors.length > 3).map(([key, value]) => `${key}: has authors ` + value.authors.join(',')))
+}
+const init = await initialize(subreddit);
+const config = {
+  mode, isCount, isFull, postLimit: isCount ? count : Infinity, burst_mode, subreddit, ...init
+}
+if (isCount && isNaN(count)) {
+  console.error('In count mode, please specify a numeric count.');
+  process.exit(1);
 }
 
+main(config);
+
+async function initialize(subreddit) {
+  const tokenholder = { token: "" };
+  await check_auth_token_expired(tokenholder);
+
+  const headers = {
+    "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
+    Authorization: `Bearer ${tokenholder.token}`,
+  };
+
+  const isSfwPublic = await check_subreddit_public_sfw_exists(headers, subreddit);
+
+  if (!isSfwPublic) {
+    console.error(`Subreddit "${subreddit}" does not exist, or is not public and SFW.`);
+    process.exit(1);
+  }
+  return { headers, tokenholder, isSfwPublic };
+}
 
 async function check_auth_token_expired(tokenholder) {
   try {
@@ -106,26 +121,6 @@ async function get_and_save_auth_token(tokenholder) {
   }
 }
 
-function check_request_count(proposed_requests) {
-  return proposed_requests < (1000 - get_request_count());
-}
-
-function get_request_count() {
-  return trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
-    return Number(current.split(':')[0]) + accumulator
-  }, 0);
-};
-
-function log_request_count(request_count) {
-  let log = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(','));
-  log.push(`${request_count}:${Date.now()}`)
-  writeFileSync('requestlog.txt', log.join(','));
-}
-
-function trim_request_log(log) {
-  return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
-}
-
 async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
   try {
     const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/about`, {
@@ -157,12 +152,57 @@ async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_d
   }
 }
 
-async function get_posts_until(headers, subreddit, data, count,) {
+async function main(config) {
+  const { subreddit, isFull, postLimit } = config;
+  let data = [];
+  await get_posts_until(data, config)
+  let postMap = new Map();
+  let commentMap = new Map();
+  await get_comment_trees(headers, subreddit, data, postMap, commentMap);
+  const metrics = await calculate_metrics(data, postMap, commentMap);
+}
+
+
+function check_request_count(proposed_requests) {
+  return proposed_requests < (get_request_rates().requests_remaining);
+}
+
+function get_request_rates() {
+  let request_summary = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
+    const [count, time] = current.split(':')
+    accumulator.requests_used += count
+    accumulator.window_ends_at = Math.min(Number(time), accumulator.earliest_request);
+    return accumulator;
+  }, { requests_used: 0, earliest_request: Date.now() });
+
+  return {
+    requests_used: request_summary.requests_used,
+    requests_remaining: 1000 - request_summary.requests_used,
+    window_ends_at: request_summary.earliest_request + 600000,
+    ms_remaining: request_summary.window_ends_at - Date.now()
+  }
+};
+
+function log_request_count(request_count) {
+  let log = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(','));
+  log.push(`${request_count}:${Date.now()}`)
+  writeFileSync('requestlog.txt', log.join(','));
+}
+
+function trim_request_log(log) {
+  return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
+}
+
+
+
+async function get_posts_until(data, config,) {
+
   let request_count = 0;
   //TODO, Manage requests better;
-  if (!check_request_count(count / 100)) {
+  if (!config.mode === 'count' && check_request_count(config.postLimit / 100)) {
     throw Error;
   }
+
   const limit = 100;
   let after = null;
   const params = { limit };
@@ -170,8 +210,8 @@ async function get_posts_until(headers, subreddit, data, count,) {
     try {
       if (after) params.after = after;
       request_count++;
-      const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/new`, {
-        headers, params
+      const response = await axios.get(`https://oauth.reddit.com/r/${config.subreddit}/new`, {
+        headers: config.headers, params
       })
       const children = response.data.data.children;
       if (!children || children.length === 0) break;
@@ -316,122 +356,6 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
   }
 }
 
-// function count_user_votes(data, user_likes) {
-//   data.forEach((el, ind, arr) => {
-//     if (user_likes[el.data.author] == undefined) {
-//       user_likes[el.data.author] = {
-//         post_count: 1,
-//         num_comments: el.data.num_comments,
-//         total_upvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1)),
-//         total_downvotes: el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score,
-//       }
-//     } else {
-//       user_likes[el.data.author].post_count += 1;
-//       user_likes[el.data.author].num_comments += el.data.num_comments;
-//       user_likes[el.data.author].total_upvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : el.data.score == 0 ? 0 : el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1));
-//       user_likes[el.data.author].total_downvotes += el.data.score == 0 && el.data.upvote_ratio == 0.5 ? 0 : (el.data.ratio == 0.5 ? Math.round(el.data.score / 2) : Math.round((el.data.score * el.data.upvote_ratio) / (2 * el.data.upvote_ratio - 1))) - el.data.score;
-//     }
-//   })
-// }
-
-// function convert_userinfo_csv(data) {
-//   const arr = ['author,post_count,num_comments,total_upvotes,total_downvotes'];
-
-//   for (const [key, value] of Object.entries(data)) {
-//     arr.push(key + ',' + value.post_count + ',' + value.num_comments + ',' + value.total_upvotes + ',' + value.total_downvotes)
-//   }
-//   const str = arr.join('\n')
-//   writeFileSync('userreport.csv', str)
-// }
-
-// function word_frequency_sentiment_by_user(data, user_likes, words) {
-//   user_likes['___words___'] = {}
-
-//   for (const post of data) {
-//     let author = post.data.author;
-//     const text = post.data.title + post.data.selftext;
-//     const doc = nlp.readDoc(text);
-//     const frequency_table = doc.tokens()
-//       .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
-//       .out(its.lemma, as.freqTable);
-//     // console.log(frequency_table)
-//     // console.log(doc.out(its.sentiment))
-
-//     if (!user_likes[author]['___words___']) {
-//       user_likes[author]['___words___'] = {};
-//     }
-
-//     for (const [word, frequency] of frequency_table) {
-//       if (!words[word]) {
-//         words[word] = {};
-//         words[word]['count'] = frequency
-//         words[word]['total_upvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
-//         words[word]['total_downvotes'] = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
-//         words[word]['num_comments'] = post.data.num_comments;
-//         words[word]['post_count'] = 1;
-//         words[word]['positive_sent_freq'] = 0;
-//         words[word]['neutral_sent_freq'] = 0;
-//         words[word]['negative_sent_freq'] = 0;
-//       } else {
-//         words[word].count += frequency
-//         words[word].total_upvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.score == 0 ? 0 : post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
-//         words[word].total_downvotes += post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
-//         words[word].num_comments += post.data.num_comments;
-//         words[word].post_count += 1;
-//       }
-//       if (!user_likes['___words___'][word]) {
-//         user_likes['___words___'][word] = { ...words[word], 'authors': [author] };
-//       } else {
-//         Object.entries(words[word]).forEach(([key, value]) => {
-//           if (key != 'authors') {
-//             user_likes['___words___'][word][key] += value;
-//           }
-//         })
-//         if (!user_likes['___words___'][word].authors.includes(author)) {
-//           user_likes['___words___'][word].authors.push(author);
-//         }
-//       }
-
-//       if (!user_likes[author]['___words___'][word]) {
-//         user_likes[author]['___words___'][word] = { ...words[word] }
-//       } else {
-//         Object.entries(words[word]).forEach(([key, value]) => {
-//           user_likes[author]['___words___'][word] += value;
-//         })
-//       }
-//     }
-
-
-//     const Sentiment_categorization_boundary = .3;
-//     doc.sentences().each((sentence) => {
-//       const sentiment = sentence.out(its.sentiment);
-//       // console.log(`The following sentence is given a sentiment of ${sentiment}` + sentence.out())
-//       const frequency_table = sentence.tokens()
-//         .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
-//         .out(its.lemma, as.freqTable);
-
-//       for (const [word, frequency] of frequency_table) {
-//         if (sentiment > Sentiment_categorization_boundary) {
-//           words[word].positive_sent_freq += frequency;
-//         } else if (sentiment < -Sentiment_categorization_boundary) {
-//           words[word].negative_sent_freq += frequency;
-//         } else {
-//           words[word].neutral_sent_freq += frequency;
-//         }
-//       }
-//     });
-//   }
-//console.log(words)
-
-// const arr = ['word, frequency, post_count,total_upvotes,total_downvotes,comments,neg_sent_freq,pos_sent_freq,neu_sent_freq'];
-
-// for (const [key, value] of Object.entries(words)) {
-//   arr.push(key + ',' + value.count + ',' + value.post_count + ',' + value.total_upvotes + ',' + value.total_downvotes + ',' + value.num_comments + ',' + value.negative_sent_freq + ',' + value.positive_sent_freq + ',' + value.neutral_sent_freq)
-// }
-// const str = arr.join('\n')
-// writeFileSync('wordreport.csv', str)
-// }
-
 async function calculate_metrics(data, postMap, commentMap) {
   const user_summaries = {};
   const word_summaries = {};
@@ -491,7 +415,7 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   comment_metrics.direct_reply_count = comment.data?.replies?.data?.children?.length ?? 0;
   comment_metrics.score = comment.data.score;
   comment_metrics.upvotes = comment.data.ups;
-  comment_metrics.total_downvotes = comment.data.ups - comment.data.score
+  comment_metrics.estimated_downvotes = comment.data.ups - comment.data.score
   comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
   if (comment.data.replies && comment.data?.replies?.children?.length) {
     comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id))
@@ -535,7 +459,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     user.total_upvotes += post_metrics.total_upvotes;
     user.estimated_downvotes += post_metrics.total_downvotes;
     user.text_embeddings.push(post_metrics.embeddings);
-    total_comments_on_posts += post_metrics.num_comments;
+    user.total_comments_on_posts += post_metrics.num_comments;
   }
   switch (post_metrics.sentiment.label) {
     case 'POSITIVE':
@@ -563,7 +487,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     } else {
       this_word = user.words[word[0]];
       this_word.unique_texts++;
-      this_word.frequency += [word[1]];
+      this_word.frequency += word[1];
     }
 
     let global_word;
@@ -591,7 +515,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
         break;
     }
   }
-  if (!post_embedding_performance.embeddings) {
+  if (!post_embedding_performance.post_data) {
     post_embedding_performance.post_data = [{ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, }];
   } else {
     post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, })
@@ -606,8 +530,8 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
         post_count: 0,
         author: comment.author,
         author_id: comment.author_id,
-        total_upvotes: comment.total_upvotes,
-        estimated_downvotes: comment.total_downvotes,
+        total_upvotes: comment.upvotes,
+        estimated_downvotes: comment.estimated_downvotes,
         text_embeddings: [comment.embeddings],
         users_replied_to: [],
         users_who_commented_on_own_post: [],
@@ -627,13 +551,13 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
         negative_comments: 0,
         neutral_comments: 0
       };
-      user_summaries[author_id] = user;
+      user_summaries[comment.author_id] = user;
     } else {
-      user = user_summaries[author_id];
+      user = user_summaries[comment.author_id];
       user.reply_count++;
       user.text_embeddings.push(comment.embeddings);
-      user.total_upvotes += comment.total_upvotes;
-      user.estimated_downvotes += comment.total_downvotes
+      user.total_upvotes += comment.upvotes;
+      user.estimated_downvotes += comment.estimated_downvotes
     }
 
     const parent_post = postMap.get(comment.post_id);
@@ -682,7 +606,7 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
       } else {
         this_word = user.words[word[0]];
         this_word.unique_texts++;
-        this_word.frequenct += word[1];
+        this_word.frequency += word[1];
       }
 
       let global_word;
@@ -695,7 +619,7 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
         global_word.unique_texts++;
         global_word.users.push(comment.author_id);
       }
-      switch (post_metrics.sentiment.label) {
+      switch (comment.sentiment.label) {
         case 'POSITIVE':
           this_word.positive_sentiment_freq += word[1];
           global_word.positive_sentiment_freq += word[1];
@@ -710,7 +634,7 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
           break;
       }
     }
-    post_embedding_performance.post_data.push({ embedding: comment.embeddings, num_comments: comment.num_comments, total_upvotes: comment.num_comments, total_downvotes: comment.estimated_downvotes, });
+    post_embedding_performance.post_data.push({ embedding: comment.embeddings, direct_reply_count: comment.direct_reply_count, total_upvotes: comment.upvotes, estimated_downvotes: comment.estimated_downvotes, });
   }
 }
 async function sentiment_chunker_and_aggregator(text) {
@@ -765,29 +689,29 @@ function chunk_paragraph(paragraph) {
 
 function chunk_sentences(sentences) {
   const chunks = [];
-  let current_chunk = '';
+  let currentChunk = '';
   for (let sentence of sentences) {
     if (sentence.length > 512) {
-      if (current_chunk) {
+      if (currentChunk) {
         chunks.push(currentChunk.trim());
         currentChunk = '';
       }
       chunks.push(...chunk_long_sentence(sentence.trim()))
       continue;
     }
-    if ((current_chunk + ' ' + sentence).trim().length <= 512) {
-      current_chunk += (current_chunk ? ' ' : '') + sentence;
+    if ((currentChunk + ' ' + sentence).trim().length <= 512) {
+      currentChunk += (currentChunk ? ' ' : '') + sentence;
     } else {
-      chunks.push(current_chunk.trim());
-      current_chunk = sentence;
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
     }
   }
-  if (current_chunk) chunks.push(current_chunk.trim());
+  if (currentChunk) chunks.push(currentChunk.trim());
   return chunks;
 }
 
 function chunk_long_sentence(long_sentence) {
-  const words = nlp.readDoc(sentence).tokens().out();
+  const words = nlp.readDoc(long_sentence).tokens().out();
   const chunks = [];
   let currentChunk = '';
 
