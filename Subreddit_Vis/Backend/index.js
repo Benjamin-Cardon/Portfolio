@@ -202,6 +202,7 @@ async function get_comment_trees(headers, subreddit, data, postMap, commentMap) 
     const postId = post.data.name;
     postMap.set(postId, post);
     if (!post.data.num_comments) {
+      post.comments = []
       continue;
     }
     request_budget--;
@@ -438,6 +439,7 @@ async function calculate_metrics(data, postMap, commentMap) {
   const subreddit_summary = {}
   for (const post of data) {
     const post_metrics = await calculate_post_metrics(post);
+    console.log(post)
     const comments_metrics = await calculate_comments_metrics(post.comments);
     reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance);
     reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap);
@@ -448,7 +450,7 @@ async function calculate_metrics(data, postMap, commentMap) {
 async function calculate_post_metrics(post) {
   const post_metrics = {};
   post_metrics.num_comments = post.data.num_comments;
-  post_metrics.total_direct_replies = post.comments.length;
+  post_metrics.total_direct_replies = post?.comments?.length ?? 0;
   post_metrics.total_upvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.upvote_ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
   post_metrics.total_downvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.upvote_ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
   post_metrics.author = post.data.author;
@@ -486,13 +488,14 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
     .out(its.lemma, as.freqTable);
   comment_metrics.replied_to = comment.data.parent_id;
-  comment_metrics.direct_reply_count = comment.data.replies.data.children.length;
+  comment_metrics.direct_reply_count = comment.data?.replies?.data?.children?.length ?? 0;
   comment_metrics.score = comment.data.score;
   comment_metrics.upvotes = comment.data.ups;
   comment_metrics.total_downvotes = comment.data.ups - comment.data.score
   comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
-
-  comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id))
+  if (comment.data.replies && comment.data?.replies?.children?.length) {
+    comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id))
+  }
   comments_metrics.push(comment_metrics);
 }
 function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance) {
@@ -755,7 +758,7 @@ function chunk_paragraph(paragraph) {
     paragraph_chunks.push(paragraph);
     return paragraph_chunks
   }
-  const sentences = nlp.readDoc(paragraph.trim()).doc.sentences().out();
+  const sentences = nlp.readDoc(paragraph.trim()).sentences().out();
   paragraph_chunks.push(...chunk_sentences(sentences))
   return paragraph_chunks;
 }
@@ -765,20 +768,20 @@ function chunk_sentences(sentences) {
   let current_chunk = '';
   for (let sentence of sentences) {
     if (sentence.length > 512) {
-      if (currentChunk) {
+      if (current_chunk) {
         chunks.push(currentChunk.trim());
         currentChunk = '';
       }
       chunks.push(...chunk_long_sentence(sentence.trim()))
       continue;
     }
-    if ((currentChunk + ' ' + sent).trim().length <= MAX_CHARS) {
-      currentChunk += (currentChunk ? ' ' : '') + sent;
+    if ((current_chunk + ' ' + sentence).trim().length <= 512) {
+      current_chunk += (current_chunk ? ' ' : '') + sentence;
     } else {
-      chunks.push(currentChunk.trim());
-      currentChunk = sent;
+      chunks.push(current_chunk.trim());
+      current_chunk = sentence;
     }
-    if (currentChunk) chunks.push(currentChunk.trim());
+    if (current_chunk) chunks.push(current_chunk.trim());
     return chunks;
   }
 }
@@ -790,7 +793,7 @@ function chunk_long_sentence(long_sentence) {
     let currentChunk = '';
 
     for (const word of words) {
-      if (word.length > MAX_CHARS) {
+      if (word.length > 512) {
         // extreme case: a single word longer than limit
         if (currentChunk) {
           chunks.push(currentChunk.trim());
@@ -800,7 +803,7 @@ function chunk_long_sentence(long_sentence) {
         continue;
       }
 
-      if ((currentChunk + ' ' + word).trim().length <= MAX_CHARS) {
+      if ((currentChunk + ' ' + word).trim().length <= 512) {
         currentChunk += (currentChunk ? ' ' : '') + word;
       } else {
         chunks.push(currentChunk.trim());
@@ -814,7 +817,7 @@ function chunk_long_sentence(long_sentence) {
 }
 
 function chunk_incoherently_long_string(incoherently_long_string) {
-  const numParts = Math.ceil(word.length / MAX_CHARS);
+  const numParts = Math.ceil(word.length / 512);
   const partSize = Math.ceil(word.length / numParts);
   const parts = [];
 
