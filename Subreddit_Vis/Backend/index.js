@@ -719,7 +719,7 @@ async function sentiment_chunker_and_aggregator(text) {
   const chunk_promises = chunks.map(async (chunk) => {
     let labels = await sentiment(chunk, { topk: null });
     return {
-      weight: text.length / chunk.length,
+      weight: chunk.length / text.length,
       labels
     }
   })
@@ -781,48 +781,46 @@ function chunk_sentences(sentences) {
       chunks.push(current_chunk.trim());
       current_chunk = sentence;
     }
-    if (current_chunk) chunks.push(current_chunk.trim());
-    return chunks;
   }
+  if (current_chunk) chunks.push(current_chunk.trim());
+  return chunks;
 }
 
 function chunk_long_sentence(long_sentence) {
-  function chunkLongSentence(sentence) {
-    const words = nlp.readDoc(sentence).tokens().out();
-    const chunks = [];
-    let currentChunk = '';
+  const words = nlp.readDoc(sentence).tokens().out();
+  const chunks = [];
+  let currentChunk = '';
 
-    for (const word of words) {
-      if (word.length > 512) {
-        // extreme case: a single word longer than limit
-        if (currentChunk) {
-          chunks.push(currentChunk.trim());
-          currentChunk = '';
-        }
-        chunks.push(...chunk_incoherently_long_string(word));
-        continue;
-      }
-
-      if ((currentChunk + ' ' + word).trim().length <= 512) {
-        currentChunk += (currentChunk ? ' ' : '') + word;
-      } else {
+  for (const word of words) {
+    if (word.length > 512) {
+      // extreme case: a single word longer than limit
+      if (currentChunk) {
         chunks.push(currentChunk.trim());
-        currentChunk = word;
+        currentChunk = '';
       }
+      chunks.push(...chunk_incoherently_long_string(word));
+      continue;
     }
 
-    if (currentChunk) chunks.push(currentChunk.trim());
-    return chunks;
+    if ((currentChunk + ' ' + word).trim().length <= 512) {
+      currentChunk += (currentChunk ? ' ' : '') + word;
+    } else {
+      chunks.push(currentChunk.trim());
+      currentChunk = word;
+    }
   }
+
+  if (currentChunk) chunks.push(currentChunk.trim());
+  return chunks;
 }
 
 function chunk_incoherently_long_string(incoherently_long_string) {
-  const numParts = Math.ceil(word.length / 512);
-  const partSize = Math.ceil(word.length / numParts);
+  const numParts = Math.ceil(incoherently_long_string.length / 512);
+  const partSize = Math.ceil(incoherently_long_string.length / numParts);
   const parts = [];
 
-  for (let i = 0; i < word.length; i += partSize) {
-    parts.push(word.slice(i, i + partSize));
+  for (let i = 0; i < incoherently_long_string.length; i += partSize) {
+    parts.push(incoherently_long_string.slice(i, i + partSize));
   }
 
   return parts;
