@@ -158,7 +158,7 @@ async function main(config) {
   await get_posts_until(data, config)
   let postMap = new Map();
   let commentMap = new Map();
-  await get_comment_trees(headers, subreddit, data, postMap, commentMap);
+  await get_comment_trees(config, data, postMap, commentMap);
   const metrics = await calculate_metrics(data, postMap, commentMap);
 }
 
@@ -195,8 +195,6 @@ function log_request_count(request_count) {
 function trim_request_log(log) {
   return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
 }
-
-
 
 async function get_posts_until(data, config,) {
 
@@ -258,24 +256,43 @@ async function get_posts_until(data, config,) {
   console.log(data.length)
 }
 
-async function get_comment_trees(headers, subreddit, data, postMap, commentMap) {
+async function get_comment_trees(config, data, postMap, commentMap) {
   const posts = [];
   const more_nodes_request_queue = [];
   // see if we have enough requests to get all the posts:
-  let request_budget = 1000 - get_request_count();
   let request_count = 0;
+  let isEnded = false;
+  let { requests_remaining, ms_remaining } = get_request_rates();
 
   for (const post of data) {
     const postId = post.data.name;
     postMap.set(postId, post);
+
+    if (requests_remaining === 0) {
+      if (config.isFull) {
+        await sleep(ms_remaining + 100);
+        ({ requests_remaining, ms_remaining } = get_request_rates());
+      } else if (config.isCount && config.burst_mode == 'end') {
+        isEnded = true;
+        post.comments = [];
+        continue;
+      } else if (config.isCount && config.burst_mode == 'sleep') {
+        log_request_count(request_count);
+        request_count = 0;
+        await sleep(ms_remaining + 100);
+        ({ requests_remaining, ms_remaining } = get_request_rates());
+      }
+    }
     if (!post.data.num_comments) {
-      post.comments = []
+      post.comments = [];
       continue;
     }
-    request_budget--;
+
     request_count++;
+    requests_remaining--;
+
     posts.push(axios
-      .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers })
+      .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { config.headers })
       .then((res) => {
         // As soon as this one resolves, attach the comments to the post
         post.comments = res.data[1].data.children;
@@ -283,22 +300,48 @@ async function get_comment_trees(headers, subreddit, data, postMap, commentMap) 
       .catch((err) => {
         console.error(`Failed to load comments for post ${postId}`, err);
       }));
-    if (!request_budget) {
-      break;
+
+    if (config.isFull && request_count % 50 === 0) {
+      log_request_count(request_count);
+      request_count = 0;
+      ({ requests_remaining, ms_remaining } = get_request_rates());
+    }
+
+    if (config.isFull) {
+      const delay = ms_remaining / Math.max(requests_remaining, 1);
+      await sleep(delay);
     }
   }
   log_request_count(request_count);
   request_count = 0;
   await Promise.all(posts);
 
-
   for (const post of data) {
     process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.id);
   }
 
-  while (more_nodes_request_queue.length && request_budget) {
-    request_budget--;
+  ({ requests_remaining, ms_remaining } = get_request_rates());
+
+  while (more_nodes_request_queue.length && !isEnded) {
+
+    if (requests_remaining === 0) {
+      if (config.isFull) {
+        await sleep(ms_remaining + 100);
+        ({ requests_remaining, ms_remaining } = get_request_rates());
+      } else if (config.isCount && config.burst_mode == 'end') {
+        isEnded = true;
+        continue;
+      } else if (config.isCount && config.burst_mode == 'sleep') {
+        log_request_count(request_count);
+        request_count = 0;
+        await sleep(ms_remaining + 100);
+        ({ requests_remaining, ms_remaining } = get_request_rates());
+      }
+    }
+
+    requests_remaining--;
     request_count++;
+
     const req = more_nodes_request_queue.shift();
     const { parentNode, childrenIds } = req;
     // console.log(req)
@@ -333,6 +376,7 @@ async function get_comment_trees(headers, subreddit, data, postMap, commentMap) 
           }
         }
       })
+      if (config.isFull) { await sleep(ms_remaining / Math.max(requests_remaining, 1)); }
     } catch (err) {
       console.error("Error fetching morechildren:", {
         url,
@@ -449,6 +493,7 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   }
   comments_metrics.push(comment_metrics);
 }
+
 function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance) {
   // Reduce user Summaries
   const author_id = post_metrics.author_id
@@ -548,6 +593,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, })
   }
 }
+
 function reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap) {
   for (const comment of comments_metrics) {
     // User summaries
@@ -664,6 +710,7 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
     post_embedding_performance.post_data.push({ embedding: comment.embeddings, direct_reply_count: comment.direct_reply_count, total_upvotes: comment.upvotes, estimated_downvotes: comment.estimated_downvotes, });
   }
 }
+
 async function sentiment_chunker_and_aggregator(text) {
   // if the text is less than 512 characters long, there is no need to chunk it.
   const chunks = chunk_text(text);
@@ -688,6 +735,7 @@ async function sentiment_chunker_and_aggregator(text) {
     }
   }, { label: '', score: 0 });
 }
+
 function chunk_text(text) {
   const chunks = []
   if (text.length < 512) {
