@@ -1,7 +1,8 @@
 import axios from "axios";
 import path from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { pipeline, env as transformersEnv } from "@xenova/transformers";
+import { stack, mean, pipeline, env as transformersEnv } from "@xenova/transformers";
+import { multiply, transpose } from 'mathjs';
 import dotenv from "dotenv";
 import process from 'node:process'
 dotenv.config(); // load .env file
@@ -171,7 +172,9 @@ async function main(config) {
   let commentMap = new Map();
   await get_comment_trees(config, data, postMap, commentMap);
   const metrics = await calculate_metrics(data, postMap, commentMap);
-  console.log(Object.entries(metrics.user_summaries).filter(([key, value]) => { return value.reply_count > 0 }).map(([key, value]) => value.author))
+  stack_average_user_embeddings(metrics.user_summaries)
+  compute_user_similarity_matrix(metrics.user_summaries)
+  // console.log(Object.entries(metrics.user_summaries).filter(([key, value]) => { return value.reply_count == 0 }))
 }
 
 function sleep(ms) {
@@ -478,7 +481,7 @@ async function calculate_post_metrics(post) {
   //TODO - Chunk Texts.
   post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
   post_metrics.id = post.data.id;
-  post_metrics.embeddings = await embeddings(text);
+  post_metrics.embedding = await embeddings(text, { pooling: 'mean', normalize: true });
   return post_metrics;
 }
 
@@ -500,7 +503,7 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   comment_metrics.post_id = post_fullname;
   comment_metrics.author = comment.data.author;
   comment_metrics.author_id = comment.data.author_fullname;
-  comment_metrics.embeddings = await embeddings(comment.data.body)
+  comment_metrics.embeddings = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
   comment_metrics.sentiment = await sentiment_chunker_and_aggregator(comment.data.body);
   comment_metrics.frequency_table = nlp.readDoc(text).tokens()
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
@@ -529,7 +532,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
       author_id: post_metrics.author_id,
       total_upvotes: post_metrics.total_upvotes,
       estimated_downvotes: post_metrics.total_downvotes,
-      text_embeddings: [post_metrics.embeddings],
+      text_embeddings: [post_metrics.embedding],
       users_replied_to: [],
       users_who_commented_on_own_post: [],
       users_whose_posts_were_commented_on: [],
@@ -554,7 +557,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     user.post_count++;
     user.total_upvotes += post_metrics.total_upvotes;
     user.estimated_downvotes += post_metrics.total_downvotes;
-    user.text_embeddings.push(post_metrics.embeddings);
+    user.text_embeddings.push(post_metrics.embedding);
     user.total_comments_on_posts += post_metrics.num_comments;
   }
   switch (post_metrics.sentiment.label) {
@@ -612,9 +615,9 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     }
   }
   if (!post_embedding_performance.post_data) {
-    post_embedding_performance.post_data = [{ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, }];
+    post_embedding_performance.post_data = [{ embedding: post_metrics.embedding, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, }];
   } else {
-    post_embedding_performance.post_data.push({ embedding: post_metrics.embeddings, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, })
+    post_embedding_performance.post_data.push({ embedding: post_metrics.embedding, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, })
   }
 }
 
@@ -852,4 +855,30 @@ function chunk_incoherently_long_string(incoherently_long_string) {
 function logStage(stage, details = '') {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   console.log(`[${timestamp}] [${stage}] ${details}`);
+}
+function stack_average_user_embeddings(user_summaries) {
+  for (const [key, user] of Object.entries(user_summaries)) {
+
+    if (!user.text_embeddings || user.text_embeddings.length === 0) continue;
+
+
+    const shapes = user.text_embeddings.map(t => t.dims);
+    console.log(`[DEBUG] User ${key} embedding shapes:`, shapes);
+
+    const stacked = stack(user.text_embeddings, 0);
+    console.log(stacked.dims)
+    const mean_embedding = mean(stacked, 0).squeeze();
+    console.log(mean_embedding.dims)
+    const embedding_norm = mean_embedding.norm()
+    const invNorm = 1 / embedding_norm.data[0];  // extract scalar, take reciprocal
+    const normalized = mean_embedding.mul(invNorm);
+    user.personal_summary_embedding = normalized;
+  }
+}
+function compute_user_similarity_matrix(user_summaries) {
+  const user_tensors = Object.values(user_summaries)
+    .map(u => Array.from(u.personal_summary_embedding.data));
+
+  const user_similarity = multiply(user_tensors, transpose(user_tensors));
+  console.log(user_similarity);
 }
