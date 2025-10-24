@@ -46,15 +46,19 @@ const isFull = mode == 'full';
 let burst_mode = '';
 if (isCount) {
   burst_mode = process.argv[4] || 'end';
-  if (burst_mode != 'end' && burst_mode != 'sleep') {
+  if (burst_mode !== 'end' && burst_mode !== 'sleep') {
     console.log("incorrect or no burst mode included. Defaulting to 'end' mode. In end mode, the process will end after it hits it's reddit API request limit, even if more posts or comments are available to request");
     burst_mode = 'sleep';
   }
 }
 const init = await initialize(subreddit);
+
 const config = {
   mode, isCount, isFull, postLimit: isCount ? count : Infinity, burst_mode, subreddit, ...init
 }
+
+logStage('INIT', `Mode: ${config.mode}, Subreddit: ${config.subreddit}, Post limit: ${config.postLimit}`);
+
 if (isCount && isNaN(count)) {
   console.error('In count mode, please specify a numeric count.');
   process.exit(1);
@@ -123,9 +127,16 @@ async function get_and_save_auth_token(tokenholder) {
 
 async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
   try {
+    const { requests_remaining, ms_remaining } = get_request_rates()
+    if (!requests_remaining) {
+      console.log("Tried to run function with no requests. Wait " + ms_remaining / 60000 + " minutes before trying again");
+      process.exit(1);
+    }
     const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/about`, {
       headers,
     })
+    log_request_count(1);
+
     if (response.data.data.subreddit_type == undefined && response.data.data.over18 == undefined) {
       subreddit_does_not_exist == true;
       console.log("Subreddit Does Not Exist")
@@ -160,6 +171,7 @@ async function main(config) {
   let commentMap = new Map();
   await get_comment_trees(config, data, postMap, commentMap);
   const metrics = await calculate_metrics(data, postMap, commentMap);
+  console.log(Object.entries(metrics.user_summaries).filter(([key, value]) => { return value.reply_count > 0 }).map(([key, value]) => value.author))
 }
 
 function sleep(ms) {
@@ -204,7 +216,7 @@ async function get_posts_until(data, config,) {
   const params = { limit };
 
   while (data.length < config.postLimit) {
-    const { requests_remaining, ms_remaining } = get_request_count();
+    const { requests_remaining, ms_remaining } = get_request_rates();
 
     if (requests_remaining) {
       console.log("There are currently no requests available.")
@@ -234,6 +246,7 @@ async function get_posts_until(data, config,) {
         }
         await sleep((ms_remaining / requests_remaining ?? 1));
       }
+      logStage('POST_FETCH', `Requests used: ${request_count}, Posts collected: ${data.length}`);
       if (requests_remaining == request_count && config.isCount && config.burst_mode === 'sleep') {
         log_request_count(request_count);
         request_count = 0;
@@ -253,7 +266,7 @@ async function get_posts_until(data, config,) {
   } else {
     log_request_count(request_count);
   }
-  console.log(data.length)
+  logStage('POSTS_DONE', `Total posts: ${data.length}`);
 }
 
 async function get_comment_trees(config, data, postMap, commentMap) {
@@ -263,7 +276,7 @@ async function get_comment_trees(config, data, postMap, commentMap) {
   let request_count = 0;
   let isEnded = false;
   let { requests_remaining, ms_remaining } = get_request_rates();
-
+  logStage('COMMENT_START', `Beginning comment collection for ${data.length} posts`);
   for (const post of data) {
     const postId = post.data.name;
     postMap.set(postId, post);
@@ -290,12 +303,14 @@ async function get_comment_trees(config, data, postMap, commentMap) {
 
     request_count++;
     requests_remaining--;
-
+    logStage('COMMENT_REQUEST', `Post ${post.data.name} (${post.data.num_comments} comments)`);
     posts.push(axios
-      .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { config.headers })
+      .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers: config.headers })
       .then((res) => {
         // As soon as this one resolves, attach the comments to the post
-        post.comments = res.data[1].data.children;
+        const children = res.data[1].data.children;
+        post.comments = children;
+        logStage('COMMENT_ATTACHED', `Post ${post.data.name}: ${children.length} top-level comments`);
       })
       .catch((err) => {
         console.error(`Failed to load comments for post ${postId}`, err);
@@ -315,9 +330,9 @@ async function get_comment_trees(config, data, postMap, commentMap) {
   log_request_count(request_count);
   request_count = 0;
   await Promise.all(posts);
-
+  logStage('COMMENT_TREE', `Flattening and linking comment trees`);
   for (const post of data) {
-    process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.id);
+    process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.name);
   }
 
   ({ requests_remaining, ms_remaining } = get_request_rates());
@@ -345,11 +360,11 @@ async function get_comment_trees(config, data, postMap, commentMap) {
     const req = more_nodes_request_queue.shift();
     const { parentNode, childrenIds } = req;
     // console.log(req)
-    const url = `https://oauth.reddit.com/api/morechildren.json?link_id=t3_${req.postId}&children=${childrenIds.join(",")}`;
+    const url = `https://oauth.reddit.com/api/morechildren.json?link_id=${req.postId}&children=${childrenIds.join(",")}`;
     try {
       const res = await axios.get(url, { headers });
       const newChildren = res.data.json.data.things; // array of 't1' comments
-
+      logStage('MORE_CHILDREN', `Queued ${newChildren.length} extra nodes`);
       for (const child of newChildren) {
         if (child.kind == 'more') {
           more_nodes_request_queue.push({
@@ -357,8 +372,9 @@ async function get_comment_trees(config, data, postMap, commentMap) {
             postId: req.postId,
             childrenIds: child.data.children,
           });
+          logStage('MORE_NODES', `Queued ${child.data.children.length} extra nodes`);
         } else {
-          commentMap.set(child.data.id, child)
+          commentMap.set(child.data.name, child)
           process_comment_tree_into_map_and_queue(child, commentMap, more_nodes_request_queue, req.postId)
         }
       }
@@ -399,7 +415,7 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
       ? [...rootNode.data.replies.data.children]
       : [];
   }
-
+  logStage('COMMENT_TREE_PROCESS', `Root ${postId}, initial queue length: ${queue.length}`);
   while (queue.length > 0) {
     const node = queue.shift();
 
@@ -428,17 +444,21 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
 }
 
 async function calculate_metrics(data, postMap, commentMap) {
+  logStage('METRICS_START', `Calculating metrics for ${data.length} posts`);
   const user_summaries = {};
   const word_summaries = {};
   const post_embedding_performance = {};
   const subreddit_summary = {}
   for (const post of data) {
     const post_metrics = await calculate_post_metrics(post);
-    console.log(post)
-    const comments_metrics = await calculate_comments_metrics(post.comments);
+    logStage('METRICS_POST', `Post metrics computed for ${post.data.name}`);
+    // console.log(post)
+    const comments_metrics = await calculate_comments_metrics(post.comments, post.data.name);
+    logStage('METRICS_COMMENTS', `Flattened ${comments_metrics.length} comments for post`);
     reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance);
     reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap);
   }
+  logStage('METRICS_DONE', `Completed metrics. Users: ${Object.keys(user_summaries).length},Words:${Object.keys(word_summaries).length}`);
   return { user_summaries, word_summaries, post_embedding_performance, subreddit_summary }
 }
 
@@ -462,19 +482,22 @@ async function calculate_post_metrics(post) {
   return post_metrics;
 }
 
-function calculate_comments_metrics(comments) {
+async function calculate_comments_metrics(comments, post_fullname) {
   let comments_metrics = [];
+  logStage('COMMENT_METRIC', `Input comments for flatten: ${comments?.length || 0}`);
   for (const comment of comments) {
-    calculate_comment_metrics_tree_flatten(comments_metrics, comment)
+    await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname)
   }
   return comments_metrics;
 }
 
-async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_id,) {
+async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname,) {
+  logStage('COMMENT_FLATTEN', `Flattening comment ${comment.data.id}, parent ${comment.data.parent_id}`);
+
   const comment_metrics = {};
   const text = comment.data.body;
   comment_metrics.id = comment.data.id;
-  comment_metrics.post_id = post_id == undefined ? comment.data.parent_id : post_id;
+  comment_metrics.post_id = post_fullname;
   comment_metrics.author = comment.data.author;
   comment_metrics.author_id = comment.data.author_fullname;
   comment_metrics.embeddings = await embeddings(comment.data.body)
@@ -495,6 +518,7 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
 }
 
 function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance) {
+  logStage('REDUCE_POST', `Reducing post: ${post_metrics.id} by ${post_metrics.author}`);
   // Reduce user Summaries
   const author_id = post_metrics.author_id
   let user;
@@ -596,6 +620,7 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
 
 function reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap) {
   for (const comment of comments_metrics) {
+    logStage('REDUCE_COMMENT', `Reducing comment: ${comment.id} by ${comment.author}`);
     // User summaries
     let user;
     if (!user_summaries[comment.author_id]) {
@@ -632,18 +657,17 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
       user.total_upvotes += comment.upvotes;
       user.estimated_downvotes += comment.estimated_downvotes
     }
-
-    const parent_post = postMap.get(comment.post_id);
-    let direct_parent;
-    if (comment.parent_id.slice(0, 3) == 't1') {
-      direct_parent = commentMap.get(comment.parent_id);
-    } else {
-      direct_parent = postMap.get(comment.parent_id);
+    if (!postMap.has(comment.post_id)) {
+      console.log(comment.post_id);
+      console.log("This comment's parent existed in the postmap")
     }
+    const parent_post = postMap.get(comment.post_id);
+    const direct_parent = comment.post_id.startsWith("t1_") ? commentMap.get(comment.replied_to) : postMap.get(comment.replied_to);
+
     const parent_post_user = user_summaries[parent_post.data.author_fullname];
     const direct_parent_user = user_summaries[direct_parent.data.author_fullname];
-    user.users_replied_to.push(direct_parent_user);
-    user.users_whose_posts_were_commented_on.push(parent_post_user);
+    user.users_replied_to.push(direct_parent_user.author_id);
+    user.users_whose_posts_were_commented_on.push(parent_post_user.author_id);
     parent_post_user.users_who_commented_on_own_post.push(user.author_id)
     direct_parent_user.users_who_replied_to.push(user.author_id)
 
@@ -823,4 +847,9 @@ function chunk_incoherently_long_string(incoherently_long_string) {
   }
 
   return parts;
+}
+
+function logStage(stage, details = '') {
+  const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+  console.log(`[${timestamp}] [${stage}] ${details}`);
 }
