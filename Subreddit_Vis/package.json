@@ -9,7 +9,8 @@
   "scripts": {
     "test": "test",
     "build": "esbuild Frontend/src/index.jsx --bundle --outfile=Frontend/dist/bundle.js --loader:.js=jsx --loader:.jsx=jsx",
-    "dev": "node Frontend/esbuild.config.js --watch & live-server Frontend/dist --port=3000"
+    "dev": "node Frontend/esbuild.config.js --watch & live-server Frontend/dist --port=3000",
+    "run:reddit": "node Backend/index.js count dataengineering 50 end"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.7.5",
@@ -17,6 +18,7 @@
     "axios": "^1.11.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "mathjs": "^15.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "wink-eng-lite-web-model": "^1.8.1",

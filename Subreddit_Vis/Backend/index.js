@@ -173,7 +173,9 @@ async function main(config) {
   await get_comment_trees(config, data, postMap, commentMap);
   const metrics = await calculate_metrics(data, postMap, commentMap);
   stack_average_user_embeddings(metrics.user_summaries)
-  compute_user_similarity_matrix(metrics.user_summaries)
+  write_to_json(metrics);
+  call_python_scripts();
+  // compute_user_similarity_matrix(metrics.user_summaries)
   // console.log(Object.entries(metrics.user_summaries).filter(([key, value]) => { return value.reply_count == 0 }))
 }
 
@@ -856,6 +858,7 @@ function logStage(stage, details = '') {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   console.log(`[${timestamp}] [${stage}] ${details}`);
 }
+
 function stack_average_user_embeddings(user_summaries) {
   for (const [key, user] of Object.entries(user_summaries)) {
 
@@ -875,10 +878,17 @@ function stack_average_user_embeddings(user_summaries) {
     user.personal_summary_embedding = normalized;
   }
 }
-function compute_user_similarity_matrix(user_summaries) {
-  const user_tensors = Object.values(user_summaries)
-    .map(u => Array.from(u.personal_summary_embedding.data));
 
-  const user_similarity = multiply(user_tensors, transpose(user_tensors));
-  console.log(user_similarity);
+// function compute_user_similarity_matrix(user_summaries) {
+//   const user_tensors = Object.values(user_summaries)
+//     .map(u => Array.from(u.personal_summary_embedding.data));
+
+//   const user_similarity = multiply(user_tensors, transpose(user_tensors));
+//   console.log(user_similarity);
+// }
+function write_to_json(metrics) {
+
+}
+function call_python_scripts() {
+
 }
