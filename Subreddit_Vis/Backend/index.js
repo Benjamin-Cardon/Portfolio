@@ -173,6 +173,7 @@ async function main(config) {
   await get_comment_trees(config, data, postMap, commentMap);
   const enriched_embeddings = await calculate_metrics(data, postMap, commentMap);
   stack_average_user_embeddings(enriched_embeddings)
+  console.log(enriched_embeddings.users)
   write_to_json(enriched_embeddings);
   call_python_scripts();
   // compute_user_similarity_matrix(metrics.user_summaries)
@@ -598,13 +599,14 @@ function reduce_post(post_metrics, enriched_embeddings) {
 
     let global_word;
     if (!words[word[0]]) {
-      global_word = { ...this_word, users: [post_metrics.author_id] };
+      global_word = { ...this_word, users: [post_metrics.author_id], texts: [post_metrics.id] };
       words[[0]] = global_word;
     } else {
       global_word = words[word[0]];
       global_word.frequency += this_word.frequency;
       global_word.unique_texts++;
       global_word.users.push(post_metrics.author_id);
+      global_word.texts.push(post_metrics.id);
     }
     switch (post_metrics.sentiment.label) {
       case 'POSITIVE':
@@ -712,13 +714,14 @@ function reduce_comments(comments_metrics, enriched_embeddings, postMap, comment
 
       let global_word;
       if (!words[word[0]]) {
-        global_word = { ...this_word, users: [comment.author_id] };
+        global_word = { ...this_word, users: [comment.author_id], texts: [comment.id] };
         words[word[0]] = global_word;
       } else {
         global_word = words[word[0]];
         global_word.frequency += this_word.frequency;
         global_word.unique_texts++;
         global_word.users.push(comment.author_id);
+        global_word.texts.push(comment.id);
       }
       switch (comment.sentiment.label) {
         case 'POSITIVE':
@@ -885,16 +888,8 @@ function stack_average_user_embeddings(enriched_embeddings) {
   }
 }
 
-
-// function compute_user_similarity_matrix(user_summaries) {
-//   const user_tensors = Object.values(user_summaries)
-//     .map(u => Array.from(u.personal_summary_embedding.data));
-
-//   const user_similarity = multiply(user_tensors, transpose(user_tensors));
-//   console.log(user_similarity);
-// }
-function write_to_json(metrics) {
-
+function write_to_json(enriched_embeddings) {
+  writeFileSync('data.json', JSON.stringify(enriched_embeddings));
 }
 function call_python_scripts() {
 
