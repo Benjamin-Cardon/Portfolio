@@ -171,9 +171,9 @@ async function main(config) {
   let postMap = new Map();
   let commentMap = new Map();
   await get_comment_trees(config, data, postMap, commentMap);
-  const metrics = await calculate_metrics(data, postMap, commentMap);
-  stack_average_user_embeddings(metrics.user_summaries)
-  write_to_json(metrics);
+  const enriched_embeddings = await calculate_metrics(data, postMap, commentMap);
+  stack_average_user_embeddings(enriched_embeddings)
+  write_to_json(enriched_embeddings);
   call_python_scripts();
   // compute_user_similarity_matrix(metrics.user_summaries)
   // console.log(Object.entries(metrics.user_summaries).filter(([key, value]) => { return value.reply_count == 0 }))
@@ -450,21 +450,23 @@ function process_comment_tree_into_map_and_queue(rootNode, commentMap, more_node
 
 async function calculate_metrics(data, postMap, commentMap) {
   logStage('METRICS_START', `Calculating metrics for ${data.length} posts`);
-  const user_summaries = {};
-  const word_summaries = {};
-  const post_embedding_performance = {};
-  const subreddit_summary = {}
+  const enriched_embeddings = {
+    comments: {},
+    posts: {},
+    words: {},
+    users: {},
+  };
   for (const post of data) {
     const post_metrics = await calculate_post_metrics(post);
     logStage('METRICS_POST', `Post metrics computed for ${post.data.name}`);
     // console.log(post)
     const comments_metrics = await calculate_comments_metrics(post.comments, post.data.name);
     logStage('METRICS_COMMENTS', `Flattened ${comments_metrics.length} comments for post`);
-    reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance);
-    reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap);
+    reduce_post(post_metrics, enriched_embeddings);
+    reduce_comments(comments_metrics, enriched_embeddings, postMap, commentMap);
   }
-  logStage('METRICS_DONE', `Completed metrics. Users: ${Object.keys(user_summaries).length},Words:${Object.keys(word_summaries).length}`);
-  return { user_summaries, word_summaries, post_embedding_performance, subreddit_summary }
+  logStage('METRICS_DONE', `Completed metrics. Users: ${Object.keys(enriched_embeddings.users).length},Words:${Object.keys(enriched_embeddings.words).length}`);
+  return enriched_embeddings;
 }
 
 async function calculate_post_metrics(post) {
@@ -482,7 +484,7 @@ async function calculate_post_metrics(post) {
     .out(its.lemma, as.freqTable);
   //TODO - Chunk Texts.
   post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
-  post_metrics.id = post.data.id;
+  post_metrics.id = post.data.name;
   post_metrics.embedding = await embeddings(text, { pooling: 'mean', normalize: true });
   return post_metrics;
 }
@@ -501,11 +503,11 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
 
   const comment_metrics = {};
   const text = comment.data.body;
-  comment_metrics.id = comment.data.id;
+  comment_metrics.id = comment.data.name;
   comment_metrics.post_id = post_fullname;
   comment_metrics.author = comment.data.author;
   comment_metrics.author_id = comment.data.author_fullname;
-  comment_metrics.embeddings = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
+  comment_metrics.embedding = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
   comment_metrics.sentiment = await sentiment_chunker_and_aggregator(comment.data.body);
   comment_metrics.frequency_table = nlp.readDoc(text).tokens()
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
@@ -517,24 +519,27 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   comment_metrics.estimated_downvotes = comment.data.ups - comment.data.score
   comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
   if (comment.data.replies && comment.data?.replies?.children?.length) {
-    comment.data.replies.data.children.forEach((child) => calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id))
+    for (const child of comment.data.replies.data.children) {
+      await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id);
+    }
   }
   comments_metrics.push(comment_metrics);
 }
 
-function reduce_post(post_metrics, user_summaries, word_summaries, post_embedding_performance) {
+function reduce_post(post_metrics, enriched_embeddings) {
+  const { users, words } = enriched_embeddings
   logStage('REDUCE_POST', `Reducing post: ${post_metrics.id} by ${post_metrics.author}`);
   // Reduce user Summaries
   const author_id = post_metrics.author_id
   let user;
-  if (!user_summaries[author_id]) {
+  if (!users[author_id]) {
     user = {
       post_count: 1,
       author: post_metrics.author,
       author_id: post_metrics.author_id,
       total_upvotes: post_metrics.total_upvotes,
       estimated_downvotes: post_metrics.total_downvotes,
-      text_embeddings: [post_metrics.embedding],
+      text_ids: [post_metrics.id],
       users_replied_to: [],
       users_who_commented_on_own_post: [],
       users_whose_posts_were_commented_on: [],
@@ -553,13 +558,13 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
       negative_comments: 0,
       neutral_comments: 0
     };
-    user_summaries[author_id] = user;
+    users[author_id] = user;
   } else {
-    user = user_summaries[author_id];
+    user = users[author_id];
     user.post_count++;
     user.total_upvotes += post_metrics.total_upvotes;
     user.estimated_downvotes += post_metrics.total_downvotes;
-    user.text_embeddings.push(post_metrics.embedding);
+    user.text_ids.push(post_metrics.id);
     user.total_comments_on_posts += post_metrics.num_comments;
   }
   switch (post_metrics.sentiment.label) {
@@ -592,11 +597,11 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
     }
 
     let global_word;
-    if (!word_summaries[word[0]]) {
+    if (!words[word[0]]) {
       global_word = { ...this_word, users: [post_metrics.author_id] };
-      word_summaries[word[0]] = global_word;
+      words[[0]] = global_word;
     } else {
-      global_word = word_summaries[word[0]];
+      global_word = words[word[0]];
       global_word.frequency += this_word.frequency;
       global_word.unique_texts++;
       global_word.users.push(post_metrics.author_id);
@@ -616,26 +621,23 @@ function reduce_post(post_metrics, user_summaries, word_summaries, post_embeddin
         break;
     }
   }
-  if (!post_embedding_performance.post_data) {
-    post_embedding_performance.post_data = [{ embedding: post_metrics.embedding, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, }];
-  } else {
-    post_embedding_performance.post_data.push({ embedding: post_metrics.embedding, total_direct_replies: post_metrics.total_direct_replies, total_upvotes: post_metrics.total_upvotes, total_downvotes: post_metrics.estimated_downvotes, })
-  }
+  enriched_embeddings.posts[post_metrics.id] = post_metrics;
 }
 
-function reduce_comments(comments_metrics, user_summaries, word_summaries, post_embedding_performance, postMap, commentMap) {
+function reduce_comments(comments_metrics, enriched_embeddings, postMap, commentMap) {
+  const { users, words } = enriched_embeddings;
   for (const comment of comments_metrics) {
     logStage('REDUCE_COMMENT', `Reducing comment: ${comment.id} by ${comment.author}`);
     // User summaries
     let user;
-    if (!user_summaries[comment.author_id]) {
+    if (!users[comment.author_id]) {
       user = {
         post_count: 0,
         author: comment.author,
         author_id: comment.author_id,
         total_upvotes: comment.upvotes,
         estimated_downvotes: comment.estimated_downvotes,
-        text_embeddings: [comment.embeddings],
+        text_ids: [comment.id],
         users_replied_to: [],
         users_who_commented_on_own_post: [],
         users_whose_posts_were_commented_on: [],
@@ -654,23 +656,20 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
         negative_comments: 0,
         neutral_comments: 0
       };
-      user_summaries[comment.author_id] = user;
+      users[comment.author_id] = user;
     } else {
-      user = user_summaries[comment.author_id];
+      user = users[comment.author_id];
       user.reply_count++;
-      user.text_embeddings.push(comment.embeddings);
+      user.text_ids.push(comment.id);
       user.total_upvotes += comment.upvotes;
       user.estimated_downvotes += comment.estimated_downvotes
     }
-    if (!postMap.has(comment.post_id)) {
-      console.log(comment.post_id);
-      console.log("This comment's parent existed in the postmap")
-    }
+
     const parent_post = postMap.get(comment.post_id);
     const direct_parent = comment.post_id.startsWith("t1_") ? commentMap.get(comment.replied_to) : postMap.get(comment.replied_to);
 
-    const parent_post_user = user_summaries[parent_post.data.author_fullname];
-    const direct_parent_user = user_summaries[direct_parent.data.author_fullname];
+    const parent_post_user = users[parent_post.data.author_fullname];
+    const direct_parent_user = users[direct_parent.data.author_fullname];
     user.users_replied_to.push(direct_parent_user.author_id);
     user.users_whose_posts_were_commented_on.push(parent_post_user.author_id);
     parent_post_user.users_who_commented_on_own_post.push(user.author_id)
@@ -712,11 +711,11 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
       }
 
       let global_word;
-      if (!word_summaries[word[0]]) {
+      if (!words[word[0]]) {
         global_word = { ...this_word, users: [comment.author_id] };
-        word_summaries[word[0]] = global_word;
+        words[word[0]] = global_word;
       } else {
-        global_word = word_summaries[word[0]];
+        global_word = words[word[0]];
         global_word.frequency += this_word.frequency;
         global_word.unique_texts++;
         global_word.users.push(comment.author_id);
@@ -736,9 +735,10 @@ function reduce_comments(comments_metrics, user_summaries, word_summaries, post_
           break;
       }
     }
-    post_embedding_performance.post_data.push({ embedding: comment.embeddings, direct_reply_count: comment.direct_reply_count, total_upvotes: comment.upvotes, estimated_downvotes: comment.estimated_downvotes, });
+    enriched_embeddings.comments[comment.id] = comment
   }
 }
+
 
 async function sentiment_chunker_and_aggregator(text) {
   // if the text is less than 512 characters long, there is no need to chunk it.
@@ -859,25 +859,32 @@ function logStage(stage, details = '') {
   console.log(`[${timestamp}] [${stage}] ${details}`);
 }
 
-function stack_average_user_embeddings(user_summaries) {
-  for (const [key, user] of Object.entries(user_summaries)) {
+function stack_average_user_embeddings(enriched_embeddings) {
+  const { users } = enriched_embeddings;
+  for (const [user_id, user] of Object.entries(users)) {
+    const text_embeddings = user.text_ids.map((id) => {
+      if (id.startsWith('t1_')) {
+        return enriched_embeddings.comments[id].embedding;
+      } else {
+        console.log(enriched_embeddings.posts[id])
+        return enriched_embeddings.posts[id].embedding;
+      }
+    })
+    if (text_embeddings.length == 1) {
+      user.only_one_text = true;
+    } else {
+      user.only_one_text = false;
+    }
 
-    if (!user.text_embeddings || user.text_embeddings.length === 0) continue;
-
-
-    const shapes = user.text_embeddings.map(t => t.dims);
-    console.log(`[DEBUG] User ${key} embedding shapes:`, shapes);
-
-    const stacked = stack(user.text_embeddings, 0);
-    console.log(stacked.dims)
+    const stacked = stack(text_embeddings, 0);
     const mean_embedding = mean(stacked, 0).squeeze();
-    console.log(mean_embedding.dims)
-    const embedding_norm = mean_embedding.norm()
+    const embedding_norm = mean_embedding.norm();
     const invNorm = 1 / embedding_norm.data[0];  // extract scalar, take reciprocal
     const normalized = mean_embedding.mul(invNorm);
-    user.personal_summary_embedding = normalized;
+    user.embedding = normalized;
   }
 }
+
 
 // function compute_user_similarity_matrix(user_summaries) {
 //   const user_tensors = Object.values(user_summaries)
