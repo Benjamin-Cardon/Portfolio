@@ -456,12 +456,13 @@ async function calculate_metrics(data, postMap, commentMap) {
     posts: {},
     words: {},
     users: {},
+    embeddings: {},
   };
   for (const post of data) {
-    const post_metrics = await calculate_post_metrics(post);
+    const post_metrics = await calculate_post_metrics(post, enriched_embeddings);
     logStage('METRICS_POST', `Post metrics computed for ${post.data.name}`);
     // console.log(post)
-    const comments_metrics = await calculate_comments_metrics(post.comments, post.data.name);
+    const comments_metrics = await calculate_comments_metrics(post.comments, post.data.name, enriched_embeddings);
     logStage('METRICS_COMMENTS', `Flattened ${comments_metrics.length} comments for post`);
     reduce_post(post_metrics, enriched_embeddings);
     reduce_comments(comments_metrics, enriched_embeddings, postMap, commentMap);
@@ -470,7 +471,7 @@ async function calculate_metrics(data, postMap, commentMap) {
   return enriched_embeddings;
 }
 
-async function calculate_post_metrics(post) {
+async function calculate_post_metrics(post, enriched_embeddings) {
   const post_metrics = {};
   post_metrics.num_comments = post.data.num_comments;
   post_metrics.total_direct_replies = post?.comments?.length ?? 0;
@@ -486,20 +487,21 @@ async function calculate_post_metrics(post) {
   //TODO - Chunk Texts.
   post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
   post_metrics.id = post.data.name;
-  post_metrics.embedding = await embeddings(text, { pooling: 'mean', normalize: true });
+  const embedding = await embeddings(text, { pooling: 'mean', normalize: true });
+  enriched_embeddings.embeddings[post.data.name] = embedding;
   return post_metrics;
 }
 
-async function calculate_comments_metrics(comments, post_fullname) {
+async function calculate_comments_metrics(comments, post_fullname, enriched_embeddings) {
   let comments_metrics = [];
   logStage('COMMENT_METRIC', `Input comments for flatten: ${comments?.length || 0}`);
   for (const comment of comments) {
-    await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname)
+    await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings)
   }
   return comments_metrics;
 }
 
-async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname,) {
+async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings) {
   logStage('COMMENT_FLATTEN', `Flattening comment ${comment.data.id}, parent ${comment.data.parent_id}`);
 
   const comment_metrics = {};
@@ -508,7 +510,7 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   comment_metrics.post_id = post_fullname;
   comment_metrics.author = comment.data.author;
   comment_metrics.author_id = comment.data.author_fullname;
-  comment_metrics.embedding = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
+  const embedding = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
   comment_metrics.sentiment = await sentiment_chunker_and_aggregator(comment.data.body);
   comment_metrics.frequency_table = nlp.readDoc(text).tokens()
     .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
@@ -521,10 +523,11 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
   if (comment.data.replies && comment.data?.replies?.children?.length) {
     for (const child of comment.data.replies.data.children) {
-      await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id);
+      await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id, enriched_embeddings);
     }
   }
   comments_metrics.push(comment_metrics);
+  enriched_embeddings.embeddings[comment.data.name] = embedding;
 }
 
 function reduce_post(post_metrics, enriched_embeddings) {
@@ -866,29 +869,31 @@ function stack_average_user_embeddings(enriched_embeddings) {
   const { users } = enriched_embeddings;
   for (const [user_id, user] of Object.entries(users)) {
     const text_embeddings = user.text_ids.map((id) => {
-      if (id.startsWith('t1_')) {
-        return enriched_embeddings.comments[id].embedding;
-      } else {
-        console.log(enriched_embeddings.posts[id])
-        return enriched_embeddings.posts[id].embedding;
-      }
+      return enriched_embeddings.embeddings[id]
     })
     if (text_embeddings.length == 1) {
       user.only_one_text = true;
     } else {
       user.only_one_text = false;
     }
-
+    console.log(text_embeddings)
     const stacked = stack(text_embeddings, 0);
     const mean_embedding = mean(stacked, 0).squeeze();
     const embedding_norm = mean_embedding.norm();
     const invNorm = 1 / embedding_norm.data[0];  // extract scalar, take reciprocal
     const normalized = mean_embedding.mul(invNorm);
-    user.embedding = normalized;
+    if (!user.only_one_text) {
+      text_embeddings[user_id] = normalized;
+    }
   }
 }
 
 function write_to_json(enriched_embeddings) {
+  const embeddings_serialized = {};
+  for (const [key, emb] of Object.entries(enriched_embeddings.embeddings)) {
+    embeddings_serialized[key] = Array.from(emb.data);
+  }
+  enriched_embeddings.embeddings = embeddings_serialized;
   writeFileSync('data.json', JSON.stringify(enriched_embeddings));
 }
 function call_python_scripts() {
