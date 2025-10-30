@@ -883,7 +883,7 @@ function stack_average_user_embeddings(enriched_embeddings) {
     const invNorm = 1 / embedding_norm.data[0];  // extract scalar, take reciprocal
     const normalized = mean_embedding.mul(invNorm);
     if (!user.only_one_text) {
-      text_embeddings[user_id] = normalized;
+      enriched_embeddings.embeddings[user_id] = normalized;
     }
   }
 }
