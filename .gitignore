@@ -4,3 +4,5 @@ node_modules/
 /Subreddit_Vis/Backend/userreport.csv
 /Subreddit_Vis/Backend/wordreport.csv
 /Subreddit_Vis/Backend/models
+/Subreddit_Vis/Backend/data.json
+/Subreddit_Vis/Backend/venv/
