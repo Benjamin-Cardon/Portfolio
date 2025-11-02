@@ -457,6 +457,7 @@ async function calculate_metrics(data, postMap, commentMap) {
     words: {},
     users: {},
     embeddings: {},
+    texts: {},
   };
   for (const post of data) {
     const post_metrics = await calculate_post_metrics(post, enriched_embeddings);
@@ -489,6 +490,7 @@ async function calculate_post_metrics(post, enriched_embeddings) {
   post_metrics.id = post.data.name;
   const embedding = await embeddings(text, { pooling: 'mean', normalize: true });
   enriched_embeddings.embeddings[post.data.name] = embedding;
+  enriched_embeddings.texts[post.data.name] = text
   return post_metrics;
 }
 
@@ -528,6 +530,7 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
   }
   comments_metrics.push(comment_metrics);
   enriched_embeddings.embeddings[comment.data.name] = embedding;
+  enriched_embeddings.texts[comment.data.name] = comment.data.body;
 }
 
 function reduce_post(post_metrics, enriched_embeddings) {
