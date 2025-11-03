@@ -3,6 +3,7 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import umap
 import umap.plot
+from scipy.cluster.hierarchy import linkage, dendrogram, to_tree
 from sklearn.cluster import AgglomerativeClustering, AffinityPropagation
 from sklearn.metrics import pairwise_distances,silhouette_score,silhouette_samples
 import numpy as np
@@ -68,6 +69,7 @@ def clustering_labeling(data):
             'label': labels,
             'silhouette': sil_scores
         })
+        print(df['label'].value_counts())
         top_ids_per_cluster = (
             df.sort_values('silhouette', ascending=False)
               .groupby('label')
@@ -75,6 +77,13 @@ def clustering_labeling(data):
         )
         merged = top_ids_per_cluster.merge(texts_df, on='id', how='left')
         print(merged[['label', 'silhouette', 'id', 'text']])
+        linkage_matrix = linkage(pca_reduced_embeddings, method="ward")
+        plt.figure(figsize=(12, 6))
+        dendrogram(linkage_matrix, truncate_mode="level", p=7)  # Show only top 5 levels
+        plt.title("Agglomerative Clustering Dendrogram (Truncated)")
+        plt.xlabel("Sample index or (cluster size)")
+        plt.ylabel("Distance")
+        plt.show()
         return
 
 data = load_enriched_embeddings()
