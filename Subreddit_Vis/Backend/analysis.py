@@ -3,6 +3,7 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import umap
 import umap.plot
+import networkx as nx
 from scipy.cluster.hierarchy import linkage, dendrogram, to_tree
 from sklearn.cluster import AgglomerativeClustering, AffinityPropagation
 from sklearn.metrics import pairwise_distances,silhouette_score,silhouette_samples
@@ -38,6 +39,7 @@ def calculate_word_vectors(data):
    return
 def recursive_children_decorator(node):
     if node.is_leaf():
+        node.children = [node.id]
         return [node.id]
     else:
         left_children = recursive_children_decorator(node.left)
@@ -45,16 +47,6 @@ def recursive_children_decorator(node):
         all_children = left_children + right_children
         node.children = all_children
         return all_children
-
-def compare_subgroups(node, pca_reduced_embeddings):
-    inner_silhouette_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.children])
-    break_left_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.left.children,node.left.right.children,node.right.children])
-    break_right_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.left.children, node.right.right.children])
-    break_right_left_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.left.children,node.left.right.children,node.right.left.children,node.right.right.children])
-    print ("This is the non-broken score", inner_silhouette_score)
-    print("This is the left broken score", break_left_score)
-    print ("this is the right broken score", break_right_score)
-    print ("this is the fully broken score", break_right_left_score)
 
 def compute_silhouette_score(pca_embeddings, id_groups):
     all_ids = [idx for group in id_groups for idx in group]
@@ -67,6 +59,89 @@ def compute_silhouette_score(pca_embeddings, id_groups):
 
     return silhouette_score(subset, labels)
 
+def compare_subgroups(node, pca_reduced_embeddings):
+    node.valid_subgroup = True
+    inner_silhouette_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.children])
+    break_left_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.left.children,node.left.right.children,node.right.children])
+    break_right_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.left.children, node.right.right.children])
+    if inner_silhouette_score > break_right_score:
+        node.right.valid_subgroup = True
+        node.right.left.valid_subgroup = False
+        node.right.right.valid_subgroup = False
+        pop_subgroups(node.right,node.right,node.left,pca_reduced_embeddings)
+    else:
+        node.right.left.valid_subgroup = True
+        node.right.right.valid_subgroup = True
+        node.right.valid_subgroup = False
+        pop_subgroups(node.right.left, node.right.left,node.right.right, pca_reduced_embeddings)
+        pop_subgroups(node.right.right, node.right.right,node.right.left, pca_reduced_embeddings)
+    if inner_silhouette_score > break_left_score:
+        node.left.valid_subgroup = True
+        node.left.left.valid_subgroup = False
+        node.left.right.valid_subgroup = False
+        pop_subgroups(node.left, node.left,node.right, pca_reduced_embeddings)
+    else:
+        node.left.valid_subgroup = False
+        node.left.left.valid_subgroup = True
+        node.left.right.valid_subgroup = True
+        pop_subgroups(node.left.right,node.left.right,node.left.left, pca_reduced_embeddings)
+        pop_subgroups(node.left.left, node.left.left,node.left.right, pca_reduced_embeddings)
+
+def check_other_splitting_conditions(node):
+    if len(node.children) < 7:
+        return False
+    if node.is_leaf():
+        return False
+    return True
+
+def pop_subgroups(node,ancestor,uncle,pca_reduced_embeddings):
+    if not check_other_splitting_conditions(node):
+        return
+    ancestor_score = compute_silhouette_score(pca_reduced_embeddings, [ancestor.children, uncle.children])
+
+    left_ids = set(node.left.children)
+    right_ids = set(node.right.children)
+
+    # Group 2: all other children from ancestor except those in node.left
+    ancestor_ids = set(ancestor.children)
+    rest_of_ancestor_left = list(ancestor_ids - left_ids)
+    rest_of_ancestor_right = list(ancestor_ids - right_ids)
+    left_score = compute_silhouette_score(pca_reduced_embeddings,[node.left.children,rest_of_ancestor_left,uncle.children])
+    right_score = compute_silhouette_score(pca_reduced_embeddings,[node.right.children,rest_of_ancestor_right,uncle.children])
+    if ancestor_score > left_score:
+        node.left.valid_subgroup = False
+        pop_subgroups(node.left,ancestor,uncle,pca_reduced_embeddings)
+    else:
+        node.left.valid_subgroup = True
+        pop_subgroups(node.left,node.left, node.right, pca_reduced_embeddings)
+    if ancestor_score > right_score:
+        node.right.valid_subgroup = False
+        pop_subgroups(node.right, ancestor, uncle, pca_reduced_embeddings)
+    else:
+        node.right.valid_subgroup = True
+        pop_subgroups(node.right,node.right,node.left,pca_reduced_embeddings)
+    return
+
+def build_subgroup_tree(node, G=None, parent_label=None, label_prefix='C', counter=[0]):
+    if G is None:
+        G = nx.DiGraph()
+
+    if hasattr(node, 'valid_subgroup') and node.valid_subgroup:
+        label = f"{label_prefix}{counter[0]}"
+        G.add_node(label, size=len(node.children))
+        print(len(node.children))
+        if parent_label:
+            G.add_edge(parent_label, label)
+        current_label = label
+        counter[0] += 1
+    else:
+        current_label = parent_label  # No new node, attach children to existing valid parent
+
+    if not node.is_leaf():
+        build_subgroup_tree(node.left, G, current_label, label_prefix, counter)
+        build_subgroup_tree(node.right, G, current_label, label_prefix, counter)
+
+    return G
 
 def clustering_labeling(data):
       embedding_matrix = data['embedding_matrix']
@@ -77,12 +152,16 @@ def clustering_labeling(data):
       linkage_matrix = linkage(pca_reduced_embeddings, method="ward")
       link_tree = to_tree(linkage_matrix)
       recursive_children_decorator(link_tree)
-      print("Comparing for Root")
       compare_subgroups(link_tree, pca_reduced_embeddings)
-      print("Comparing for left")
-      compare_subgroups(link_tree.left,pca_reduced_embeddings)
-      print("comparing for right")
-      compare_subgroups(link_tree.right,pca_reduced_embeddings)
+
+#       G = build_subgroup_tree(link_tree)
+# # Use networkx spring layout or hierarchy-style layout
+#       plt.figure(figsize=(12, 8))
+#       pos = nx.spring_layout(G, k=1.5 / np.sqrt(len(G.nodes())), seed=42)
+#       sizes = [G.nodes[n]['size'] * 10 for n in G.nodes]
+#       nx.draw(G, pos, with_labels=True, node_size=sizes, node_color='lightblue', font_size=10, arrows=True)
+#       plt.title("Hierarchy of Valid Subgroup Clusters")
+#       plt.show()
       return
       # plt.figure(figsize=(12, 6))
       # dendrogram(linkage_matrix, truncate_mode="level", p=7)  # Show only top 5 levels
