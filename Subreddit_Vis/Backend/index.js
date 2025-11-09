@@ -606,7 +606,7 @@ function reduce_post(post_metrics, enriched_embeddings) {
     let global_word;
     if (!words[word[0]]) {
       global_word = { ...this_word, users: [post_metrics.author_id], texts: [post_metrics.id] };
-      words[[0]] = global_word;
+      words[word[0]] = global_word;
     } else {
       global_word = words[word[0]];
       global_word.frequency += this_word.frequency;

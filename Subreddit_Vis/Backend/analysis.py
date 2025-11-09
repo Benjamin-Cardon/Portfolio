@@ -17,10 +17,10 @@ def load_enriched_embeddings(path="./data.json"):
       data = json.load(f)
       print(type(data))
       print(data.keys())
-      comments_df = pd.DataFrame(data['comments'])
-      posts_df = pd.DataFrame(data['posts'])
-      words_df = pd.DataFrame(data['words'])
-      users_df = pd.DataFrame(data['users'])
+      users_df    = pd.DataFrame.from_dict(data['users'], orient='index')
+      posts_df    = pd.DataFrame.from_dict(data['posts'], orient='index')
+      comments_df = pd.DataFrame.from_dict(data['comments'], orient='index')
+      words_df = pd.DataFrame.from_dict(data['words'], orient='index')
       embedding_ids = list(data["embeddings"].keys())
       embedding_matrix = np.array(list(data['embeddings'].values()),dtype='float32')
       texts= data['texts']
@@ -34,9 +34,41 @@ def load_enriched_embeddings(path="./data.json"):
     "texts": texts
 }
 
+def user_words_to_vector(word_data, word_to_index, vocab_size):
+  vec = np.zeros(vocab_size, dtype=np.float32)
+  for word, info in word_data.items():
+          if word in word_to_index:
+            vec[word_to_index[word]] = info.get('frequency', 0)
+          else:
+              print("This word is not in our global word vector" + word)
+  return vec
+
+def frequency_table_to_vector(word_data, word_to_index, vocab_size):
+  vec = np.zeros(vocab_size, dtype=np.float32)
+  for word, count in word_data:
+          if word in word_to_index:
+            vec[word_to_index[word]] = count
+          else:
+            print("This word is not in our global word vector" + word)
+  return vec
+
+
 def calculate_word_vectors(data):
-   print("Do I need this function?")
-   return
+  users = data['users']
+  posts = data ['posts']
+  comments = data['comments']
+  words = data['words']
+  vocab_index = words.index.tolist()  # If you already have a column index, use that
+  vocab_size = len(vocab_index)
+  word_to_index = {word: idx for idx, word in enumerate(vocab_index)}
+  print(len(word_to_index))
+  users['word_count_vector'] = users['words'].apply(lambda wd: user_words_to_vector(wd, word_to_index, vocab_size))
+  comments['word_count_vector'] = comments['frequency_table'].apply(lambda wd: frequency_table_to_vector(wd,word_to_index, vocab_size))
+  posts['word_count_vector'] = posts['frequency_table'].apply(lambda wd:frequency_table_to_vector(wd,word_to_index,vocab_size))
+  data['global_word_vector']  = words['frequency'].reindex(vocab_index).to_numpy(dtype=np.float32)
+
+  return
+
 def recursive_children_decorator(node):
     if node.is_leaf():
         node.children = [node.id]
@@ -154,14 +186,9 @@ def clustering_labeling(data):
       recursive_children_decorator(link_tree)
       compare_subgroups(link_tree, pca_reduced_embeddings)
 
-#       G = build_subgroup_tree(link_tree)
-# # Use networkx spring layout or hierarchy-style layout
-#       plt.figure(figsize=(12, 8))
-#       pos = nx.spring_layout(G, k=1.5 / np.sqrt(len(G.nodes())), seed=42)
-#       sizes = [G.nodes[n]['size'] * 10 for n in G.nodes]
-#       nx.draw(G, pos, with_labels=True, node_size=sizes, node_color='lightblue', font_size=10, arrows=True)
-#       plt.title("Hierarchy of Valid Subgroup Clusters")
-#       plt.show()
+
+
+
       return
       # plt.figure(figsize=(12, 6))
       # dendrogram(linkage_matrix, truncate_mode="level", p=7)  # Show only top 5 levels
@@ -171,7 +198,18 @@ def clustering_labeling(data):
       # plt.show()
       # return
 
+
+#       G = build_subgroup_tree(link_tree)
+# # Use networkx spring layout or hierarchy-style layout
+#       plt.figure(figsize=(12, 8))
+#       pos = nx.spring_layout(G, k=1.5 / np.sqrt(len(G.nodes())), seed=42)
+#       sizes = [G.nodes[n]['size'] * 10 for n in G.nodes]
+#       nx.draw(G, pos, with_labels=True, node_size=sizes, node_color='lightblue', font_size=10, arrows=True)
+#       plt.title("Hierarchy of Valid Subgroup Clusters")
+#       plt.show()
+
 data = load_enriched_embeddings()
+calculate_word_vectors(data)
 clustering_labeling(data)
 
       # max_score = 0
