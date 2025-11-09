@@ -10,7 +10,11 @@ from sklearn.metrics import pairwise_distances,silhouette_score,silhouette_sampl
 import numpy as np
 import pandas as pd
 from pathlib import Path
-
+from sklearn.covariance import LedoitWolf
+from numpy.linalg import pinv
+from numpy import quantile
+from scipy.spatial import ConvexHull
+from matplotlib.patches import Polygon
 def load_enriched_embeddings(path="./data.json"):
   p=Path(path)
   with p.open("r", encoding="utf-8") as f:
@@ -69,13 +73,13 @@ def calculate_word_vectors(data):
 
   return
 
-def recursive_children_decorator(node):
+def recursive_children_decorator(node,id_map):
     if node.is_leaf():
-        node.children = [node.id]
-        return [node.id]
+        node.children = [int(id_map[node.id]) ]
+        return [int(id_map[node.id])]
     else:
-        left_children = recursive_children_decorator(node.left)
-        right_children = recursive_children_decorator(node.right)
+        left_children = recursive_children_decorator(node.left,id_map)
+        right_children = recursive_children_decorator(node.right,id_map)
         all_children = left_children + right_children
         node.children = all_children
         return all_children
@@ -90,30 +94,29 @@ def compute_silhouette_score(pca_embeddings, id_groups):
         return None  # Silhouette needs at least 2 distinct labels
 
     return silhouette_score(subset, labels)
-
+def init_valid_flags(node):
+  node.valid_subgroup = False
+  if not node.is_leaf():
+    init_valid_flags(node.left)
+    init_valid_flags(node.right)
 def compare_subgroups(node, pca_reduced_embeddings):
+    init_valid_flags(node)
     node.valid_subgroup = True
     inner_silhouette_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.children])
     break_left_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.left.children,node.left.right.children,node.right.children])
     break_right_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.left.children, node.right.right.children])
     if inner_silhouette_score > break_right_score:
         node.right.valid_subgroup = True
-        node.right.left.valid_subgroup = False
-        node.right.right.valid_subgroup = False
         pop_subgroups(node.right,node.right,node.left,pca_reduced_embeddings)
     else:
         node.right.left.valid_subgroup = True
         node.right.right.valid_subgroup = True
-        node.right.valid_subgroup = False
         pop_subgroups(node.right.left, node.right.left,node.right.right, pca_reduced_embeddings)
         pop_subgroups(node.right.right, node.right.right,node.right.left, pca_reduced_embeddings)
     if inner_silhouette_score > break_left_score:
         node.left.valid_subgroup = True
-        node.left.left.valid_subgroup = False
-        node.left.right.valid_subgroup = False
         pop_subgroups(node.left, node.left,node.right, pca_reduced_embeddings)
     else:
-        node.left.valid_subgroup = False
         node.left.left.valid_subgroup = True
         node.left.right.valid_subgroup = True
         pop_subgroups(node.left.right,node.left.right,node.left.left, pca_reduced_embeddings)
@@ -154,38 +157,189 @@ def pop_subgroups(node,ancestor,uncle,pca_reduced_embeddings):
         pop_subgroups(node.right,node.right,node.left,pca_reduced_embeddings)
     return
 
-def build_subgroup_tree(node, G=None, parent_label=None, label_prefix='C', counter=[0]):
-    if G is None:
-        G = nx.DiGraph()
+def compute_umap_2d(embedding_matrix, n_neighbors=30, min_dist=0.05, metric="cosine", random_state=42):
+    reducer = umap.UMAP(
+        n_components=2,
+        n_neighbors=n_neighbors,
+        min_dist=min_dist,
+        metric=metric,
+        random_state=random_state,
+        verbose=False
+    )
+    umap_2d = reducer.fit_transform(embedding_matrix)  # shape (N, 2)
+    return umap_2d
 
-    if hasattr(node, 'valid_subgroup') and node.valid_subgroup:
-        label = f"{label_prefix}{counter[0]}"
-        G.add_node(label, size=len(node.children))
-        print(len(node.children))
-        if parent_label:
-            G.add_edge(parent_label, label)
-        current_label = label
-        counter[0] += 1
+def walk_subgroups(root):
+    """Yield (node, children_ids) for every subgroup node (including root)."""
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        yield node, node.children_ids
+        stack.extend(node.subgroups)
+
+def enumerate_subgroups(root):
+    labels = {}
+    i = 0
+    for node, children in walk_subgroups(root):
+        labels[node] = f"C{i}"
+        i += 1
+    return labels
+
+def plot_umap_with_subgroups(
+    umap_2d, ids, is_user_mask, subgroup_tree, point_size=6, alpha_points=0.25, alpha_hull=0.15
+):
+    """umap_2d: (N,2), ids: np.array of strings, is_user_mask: boolean array (N,)"""
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # 1) all points (faint)
+    ax.scatter(umap_2d[:,0], umap_2d[:,1], s=point_size, c="#888888", alpha=alpha_points, linewidths=0)
+
+    # 2) users emphasized
+    if is_user_mask is not None and is_user_mask.any():
+        ax.scatter(umap_2d[is_user_mask,0], umap_2d[is_user_mask,1],
+                   s=point_size+6, c="k", alpha=0.6, linewidths=0, label="users")
+
+    # 3) subgroup hulls
+    label_map = enumerate_subgroups(subgroup_tree)
+    for node, children in walk_subgroups(subgroup_tree):
+        pts = umap_2d[np.array(children, dtype=int)]
+        if pts.shape[0] < 3:
+            # Too few points for a hull: draw a small ring of points instead
+            ax.scatter(pts[:,0], pts[:,1], s=point_size+10, facecolors="none", edgecolors="C0", alpha=0.5)
+            continue
+
+        try:
+            hull = ConvexHull(pts)
+            poly = Polygon(pts[hull.vertices], closed=True, facecolor="C0", edgecolor="C0", alpha=alpha_hull)
+            ax.add_patch(poly)
+
+            # Put a label at the centroid of the subgroup in UMAP space
+            cx, cy = pts.mean(axis=0)
+            ax.text(cx, cy, label_map[node], fontsize=9, ha="center", va="center", color="C0")
+        except Exception:
+            # Hull can fail for degenerate point sets; fall back to scatter
+            ax.scatter(pts[:,0], pts[:,1], s=point_size+10, facecolors="none", edgecolors="C0", alpha=0.5)
+
+    ax.set_title("UMAP of embeddings with subgroup overlays")
+    ax.set_xlabel("UMAP-1")
+    ax.set_ylabel("UMAP-2")
+    ax.legend(loc="best", frameon=False)
+    ax.grid(True, alpha=0.2)
+    plt.tight_layout()
+    plt.show()
+
+def visualize_subgroups_with_umap(data, subgroup_tree):
+    embedding_matrix = data["embedding_matrix"]
+    ids = np.array(data["embedding_ids"])
+    is_user = np.char.startswith(ids, "t2_")
+
+    umap_2d = compute_umap_2d(embedding_matrix, n_neighbors=30, min_dist=0.05, metric="cosine", random_state=42)
+    plot_umap_with_subgroups(umap_2d, ids, is_user, subgroup_tree)
+# def build_subgroup_tree(node, G=None, parent_label=None, label_prefix='C', counter=[0]):
+#     if G is None:
+#         G = nx.DiGraph()
+
+#     if hasattr(node, 'valid_subgroup') and node.valid_subgroup:
+#         label = f"{label_prefix}{counter[0]}"
+#         G.add_node(label, size=len(node.children))
+#         print(len(node.children))
+#         if parent_label:
+#             G.add_edge(parent_label, label)
+#         current_label = label
+#         counter[0] += 1
+#     else:
+#         current_label = parent_label  # No new node, attach children to existing valid parent
+
+#     if not node.is_leaf():
+#         build_subgroup_tree(node.left, G, current_label, label_prefix, counter)
+#         build_subgroup_tree(node.right, G, current_label, label_prefix, counter)
+#     return G
+class Subgroup_Node:
+    def __init__(self, parent, children_ids,embedding_matrix):
+        self.parent = parent
+        self.subgroups = []
+        self.user_locs = []
+        self.children_ids = children_ids
+        cluster_points = embedding_matrix[children_ids]
+        centroid = cluster_points.mean(axis=0)
+        self.centroid = centroid
+        centered_points = cluster_points - centroid
+        ledoit = LedoitWolf().fit(centered_points)
+        covariance_matrix = ledoit.covariance_
+        inverse_covariance = pinv(covariance_matrix)
+        self.inverse_covariance = inverse_covariance
+        squared_distances_train = np.einsum('ij,jk,ik->i', centered_points, inverse_covariance, centered_points)
+        cutoff = quantile(squared_distances_train, 0.95)
+        self.cutoff = cutoff
+    def is_inside_cluster(self, point,user_loc):
+         diff = point - self.centroid
+         isInside = float(diff @ self.inverse_covariance @ diff) <= self.cutoff
+         if isInside:
+             self.user_locs.append(user_loc)
+         return isInside
+    def add_child_node(self, node):
+        self.subgroups.append(node)
+
+def sort_user_into_hierarchy(user_embedding,user_loc,node):
+    if len(node.subgroups) >0:
+      for subgroup in node.subgroups:
+          if subgroup.is_inside_cluster(user_embedding,user_loc):
+              sort_user_into_hierarchy(user_embedding,user_loc,subgroup)
+
+def subgroup_hierarchy_tree(link_tree, embedding_matrix):
+
+    root = Subgroup_Node(None,link_tree.children,embedding_matrix)
+    traverse_link_tree(link_tree.left,root,embedding_matrix)
+    traverse_link_tree(link_tree.right,root,embedding_matrix)
+    return root
+
+def traverse_link_tree(Node,subgroup_ancestor,embedding_matrix):
+    if(Node.is_leaf()):
+        return
+    if Node.valid_subgroup:
+       this_node = Subgroup_Node(subgroup_ancestor,Node.children,embedding_matrix)
+       if subgroup_ancestor:
+           subgroup_ancestor.add_child_node(this_node)
+       traverse_link_tree(Node.left,this_node,embedding_matrix)
+       traverse_link_tree(Node.right,this_node,embedding_matrix)
     else:
-        current_label = parent_label  # No new node, attach children to existing valid parent
-
-    if not node.is_leaf():
-        build_subgroup_tree(node.left, G, current_label, label_prefix, counter)
-        build_subgroup_tree(node.right, G, current_label, label_prefix, counter)
-
-    return G
+        traverse_link_tree(Node.left,subgroup_ancestor,embedding_matrix)
+        traverse_link_tree(Node.right,subgroup_ancestor,embedding_matrix)
 
 def clustering_labeling(data):
       embedding_matrix = data['embedding_matrix']
-      texts_df = pd.DataFrame(list(data["texts"].items()), columns=["id", "text"])
+      ids = data['embedding_ids']
+      is_comment = np.char.startswith(ids, 't1_')
+      is_post    = np.char.startswith(ids, 't3_')
+      is_user = np.char.startswith(ids, 't2_')
+      is_text    = is_comment | is_post
 
       pca = PCA(n_components=0.8, svd_solver='full')
       pca_reduced_embeddings = pca.fit_transform(embedding_matrix)
-      linkage_matrix = linkage(pca_reduced_embeddings, method="ward")
-      link_tree = to_tree(linkage_matrix)
-      recursive_children_decorator(link_tree)
-      compare_subgroups(link_tree, pca_reduced_embeddings)
 
+      text_idx = np.where(is_text)[0]
+
+      linkage_matrix = linkage(pca_reduced_embeddings[text_idx], method="ward")
+      link_tree = to_tree(linkage_matrix)
+
+      recursive_children_decorator(link_tree, text_idx)
+      compare_subgroups(link_tree, pca_reduced_embeddings)
+      subgroup_tree = subgroup_hierarchy_tree(link_tree, pca_reduced_embeddings)
+      visualize_subgroups_with_umap(data, subgroup_tree)
+      user_idx = np.where(is_user)[0]
+
+      for i in user_idx:
+        user_embedding = embedding_matrix[i]
+        user_loc = pca_reduced_embeddings[i]
+        sort_user_into_hierarchy(user_embedding, user_loc, subgroup_tree)
+
+      # # Use networkx spring layout or hierarchy-style layout
+      # plt.figure(figsize=(12, 8))
+      # pos = nx.spring_layout(G, k=1.5 / np.sqrt(len(G.nodes())), seed=42)
+      # sizes = [G.nodes[n]['size'] * 10 for n in G.nodes]
+      # nx.draw(G, pos, with_labels=True, node_size=sizes, node_color='lightblue', font_size=10, arrows=True)
+      # plt.title("Hierarchy of Valid Subgroup Clusters")
+      # plt.show()
 
 
 
@@ -197,20 +351,38 @@ def clustering_labeling(data):
       # plt.ylabel("Distance")
       # plt.show()
       # return
+def generate_labels(link_tree,data):
+    #We'll find exemplar texts
+    #find the word count differences between groups, and several used/non-used words
+    #We'll use these to produce a structured query for a local llm.
+    #The query will include
+    # The name of the reddit, the name of the supergroup (if any), what words are commonly used or not used in the reddit, and the texts of our 3-5 exemplars
+    # We'll request a label which is 1-3 words long and is descriptive.
+    return
 
+def find_exemplar_texts(link_tree,data):
+    # In our list of texts, we want to find their distances from the centroid.
+    # An exemplar is either - A, one of the texts which is most close to the centroid
+    # B A text which is in the top half in terms of distance from the centroid, and has higher engagement than other points
+    # Engagement can either be upvotes or comments/replies
+    # if one text is all of these things, we'll find a few more.
+    return
 
-#       G = build_subgroup_tree(link_tree)
-# # Use networkx spring layout or hierarchy-style layout
-#       plt.figure(figsize=(12, 8))
-#       pos = nx.spring_layout(G, k=1.5 / np.sqrt(len(G.nodes())), seed=42)
-#       sizes = [G.nodes[n]['size'] * 10 for n in G.nodes]
-#       nx.draw(G, pos, with_labels=True, node_size=sizes, node_color='lightblue', font_size=10, arrows=True)
-#       plt.title("Hierarchy of Valid Subgroup Clusters")
-#       plt.show()
+def find_word_count_differences(link_tree,data):
+    # we should gather, summarize, and normalize the word counts between each of the different groups.
+    # We should also have a normalized form of the entire subreddit wordcount.
+    # The difference between the normalized form and the entire subreddit is the "Difference"
+    # Then, for each subreddit we should find the words with the largest and smallest values - these are our summary.
+    # Do we want to do any kind of elbow method here?
+    # What about weighting by engagement?
+    return
+
 
 data = load_enriched_embeddings()
 calculate_word_vectors(data)
 clustering_labeling(data)
+
+
 
       # max_score = 0
       # top_cluster_count = 0
