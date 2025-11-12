@@ -316,19 +316,12 @@ def clustering_labeling(data):
 
       for i in user_idx:
         id = ids[i]
+        subgroup_tree.user_ids.append(id)
+        subgroup_tree.user_locs.append(i)
         user_embedding = pca_reduced_embeddings[i]
         sort_user_into_hierarchy(user_embedding, i, subgroup_tree,id)
       make_subgroup_df(subgroup_tree,data)
-      # # Use networkx spring layout or hierarchy-style layout
-      # plt.figure(figsize=(12, 8))
-      # pos = nx.spring_layout(G, k=1.5 / np.sqrt(len(G.nodes())), seed=42)
-      # sizes = [G.nodes[n]['size'] * 10 for n in G.nodes]
-      # nx.draw(G, pos, with_labels=True, node_size=sizes, node_color='lightblue', font_size=10, arrows=True)
-      # plt.title("Hierarchy of Valid Subgroup Clusters")
-      # plt.show()
-
-
-
+      find_word_count_differences(data)
       return
 
 def make_subgroup_df(subgroup_tree, data):
@@ -372,19 +365,10 @@ def make_subgroup_df(subgroup_tree, data):
             stack.append((subgroup,group_id, depth+1))
         group_id += 1
     subgroups_df = pd.DataFrame.from_records(subgroup_objects)
+    data['subgroups'] = subgroups_df
     print(subgroups_df.head())
 
-
-
-
-      # plt.figure(figsize=(12, 6))
-      # dendrogram(linkage_matrix, truncate_mode="level", p=7)  # Show only top 5 levels
-      # plt.title("Agglomerative Clustering Dendrogram (Truncated)")
-      # plt.xlabel("Sample index or (cluster size)")
-      # plt.ylabel("Distance")
-      # plt.show()
-      # return
-def generate_labels(link_tree,data):
+def generate_labels(data):
     #We'll find exemplar texts
     #find the word count differences between groups, and several used/non-used words
     #We'll use these to produce a structured query for a local llm.
@@ -401,14 +385,83 @@ def find_exemplar_texts(link_tree,data):
     # if one text is all of these things, we'll find a few more.
     return
 
-def find_word_count_differences(link_tree,data):
+def find_word_count_differences(data):
+    ids   = np.array(data["embedding_ids"])
+    subgroups_df = data['subgroups']
+    comments = data['comments']
+    posts = data['posts']
+    global_counts= data['global_word_vector'].astype(np.float32)
+    vocab = data["words"].index.tolist()
+    V = global_counts.size
+
+    summaries = []
+    all_idx = (subgroups_df["subgroup_texts"]
+               .explode().dropna().astype(int).unique())
+    def _get_word_vector(gi):
+        id_str = ids[gi]
+        if id_str.startswith("t1_"):
+            if id_str in comments.index:
+                return comments.at[id_str, "word_count_vector"]
+        elif id_str.startswith("t3_"):
+            if id_str in posts.index:
+                return posts.at[id_str, "word_count_vector"]
+    vec_by_idx = {int(gi): _get_word_vector(int(gi)) for gi in all_idx}
+
+    for text_list in subgroups_df['subgroup_texts']:
+        summary = np.zeros_like(_get_word_vector(text_list[0]))
+        for gi in text_list:
+            vec = vec_by_idx.get(int(gi))
+            if vec is not None:
+                summary += vec
+        summaries.append(summary)
+    subgroups_df['subgroup_word_counts'] = summaries
+    subgroups_df["wlogodds_z"] = [
+    weighted_log_odds_z(vec.astype(np.float32), global_counts.astype(np.float32), alpha=1.0)
+    for vec in subgroups_df["subgroup_word_counts"]
+    ]
+    group = 0
+    for logs_odds in subgroups_df["wlogodds_z"]:
+        print(f"Finding most common words for group {group} :")
+        group += 1
+        p = np.argsort(logs_odds)
+        top5 = p[-5:][::-1]
+        for word in top5:
+            print(vocab[word])
+
+
+
+
+def weighted_log_odds_z(y1, y_global, alpha=10.0):
+    # y1: subgroup counts (V,)
+    # y_global: global counts (V,)
+    y2 = np.clip(y_global - y1, 0, None)  # background excluding the group
+    n1, n2 = y1.sum(), y2.sum()
+    # prior π: global probabilities
+    pi = y_global / max(y_global.sum(), 1e-12)
+
+    # smoothed probabilities
+    p1 = (y1 + alpha * pi) / (n1 + alpha)
+    p2 = (y2 + alpha * pi) / (n2 + alpha)
+
+    # log-odds
+    logit1 = np.log(p1) - np.log1p(-p1)
+    logit2 = np.log(p2) - np.log1p(-p2)
+    delta  = logit1 - logit2
+
+    # variance approximation (Monroe et al.)
+    var = 1.0 / (y1 + alpha * pi) + 1.0 / (y2 + alpha * pi)
+    z = delta / np.sqrt(var)
+    return z.astype(np.float32)
+
+
+
     # we should gather, summarize, and normalize the word counts between each of the different groups.
     # We should also have a normalized form of the entire subreddit wordcount.
     # The difference between the normalized form and the entire subreddit is the "Difference"
     # Then, for each subreddit we should find the words with the largest and smallest values - these are our summary.
     # Do we want to do any kind of elbow method here?
     # What about weighting by engagement?
-    return
+
 
 
 data = load_enriched_embeddings()
