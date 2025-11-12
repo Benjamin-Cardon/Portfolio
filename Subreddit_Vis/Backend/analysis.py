@@ -94,11 +94,13 @@ def compute_silhouette_score(pca_embeddings, id_groups):
         return None  # Silhouette needs at least 2 distinct labels
 
     return silhouette_score(subset, labels)
+
 def init_valid_flags(node):
   node.valid_subgroup = False
   if not node.is_leaf():
     init_valid_flags(node.left)
     init_valid_flags(node.right)
+
 def compare_subgroups(node, pca_reduced_embeddings):
     init_valid_flags(node)
     node.valid_subgroup = True
@@ -235,30 +237,13 @@ def visualize_subgroups_with_umap(data, subgroup_tree):
 
     umap_2d = compute_umap_2d(embedding_matrix, n_neighbors=30, min_dist=0.05, metric="cosine", random_state=42)
     plot_umap_with_subgroups(umap_2d, ids, is_user, subgroup_tree)
-# def build_subgroup_tree(node, G=None, parent_label=None, label_prefix='C', counter=[0]):
-#     if G is None:
-#         G = nx.DiGraph()
 
-#     if hasattr(node, 'valid_subgroup') and node.valid_subgroup:
-#         label = f"{label_prefix}{counter[0]}"
-#         G.add_node(label, size=len(node.children))
-#         print(len(node.children))
-#         if parent_label:
-#             G.add_edge(parent_label, label)
-#         current_label = label
-#         counter[0] += 1
-#     else:
-#         current_label = parent_label  # No new node, attach children to existing valid parent
-
-#     if not node.is_leaf():
-#         build_subgroup_tree(node.left, G, current_label, label_prefix, counter)
-#         build_subgroup_tree(node.right, G, current_label, label_prefix, counter)
-#     return G
 class Subgroup_Node:
     def __init__(self, parent, children_ids,embedding_matrix):
         self.parent = parent
         self.subgroups = []
         self.user_locs = []
+        self.user_ids=[]
         self.children_ids = children_ids
         cluster_points = embedding_matrix[children_ids]
         centroid = cluster_points.mean(axis=0)
@@ -271,20 +256,21 @@ class Subgroup_Node:
         squared_distances_train = np.einsum('ij,jk,ik->i', centered_points, inverse_covariance, centered_points)
         cutoff = quantile(squared_distances_train, 0.95)
         self.cutoff = cutoff
-    def is_inside_cluster(self, point,user_loc):
+    def is_inside_cluster(self, point,user_loc,id):
          diff = point - self.centroid
          isInside = float(diff @ self.inverse_covariance @ diff) <= self.cutoff
          if isInside:
              self.user_locs.append(user_loc)
+             self.user_ids.append(id)
          return isInside
     def add_child_node(self, node):
         self.subgroups.append(node)
 
-def sort_user_into_hierarchy(user_embedding,user_loc,node):
+def sort_user_into_hierarchy(user_embedding,user_loc,node,id):
     if len(node.subgroups) >0:
       for subgroup in node.subgroups:
-          if subgroup.is_inside_cluster(user_embedding,user_loc):
-              sort_user_into_hierarchy(user_embedding,user_loc,subgroup)
+          if subgroup.is_inside_cluster(user_embedding,user_loc,id):
+              sort_user_into_hierarchy(user_embedding,user_loc,subgroup,id)
 
 def subgroup_hierarchy_tree(link_tree, embedding_matrix):
 
@@ -329,10 +315,10 @@ def clustering_labeling(data):
       user_idx = np.where(is_user)[0]
 
       for i in user_idx:
-        user_embedding = embedding_matrix[i]
-        user_loc = pca_reduced_embeddings[i]
-        sort_user_into_hierarchy(user_embedding, user_loc, subgroup_tree)
-
+        id = ids[i]
+        user_embedding = pca_reduced_embeddings[i]
+        sort_user_into_hierarchy(user_embedding, i, subgroup_tree,id)
+      make_subgroup_df(subgroup_tree,data)
       # # Use networkx spring layout or hierarchy-style layout
       # plt.figure(figsize=(12, 8))
       # pos = nx.spring_layout(G, k=1.5 / np.sqrt(len(G.nodes())), seed=42)
@@ -344,6 +330,53 @@ def clustering_labeling(data):
 
 
       return
+
+def make_subgroup_df(subgroup_tree, data):
+    users_df = data['users']
+    comments_df = data['comments']
+    posts_df = data['posts']
+    ids = data['embedding_ids']
+    for df in (users_df, comments_df, posts_df):
+        df["Subgroup_hierarchy"] = pd.Series([[] for _ in range(len(df))], index=df.index, dtype="object")
+    def _append_to_df(id_str, subgroup_id):
+        if id_str.startswith("t2_"):
+            if id_str in users_df.index:
+                users_df.at[id_str, "Subgroup_hierarchy"].append(subgroup_id)
+        elif id_str.startswith("t1_"):
+            if id_str in comments_df.index:
+                comments_df.at[id_str, "Subgroup_hierarchy"].append(subgroup_id)
+        elif id_str.startswith("t3_"):
+            if id_str in posts_df.index:
+                posts_df.at[id_str, "Subgroup_hierarchy"].append(subgroup_id)
+
+    stack = []
+    subgroup_objects = []
+    group_id = 0
+    stack.append((subgroup_tree, None, 0))
+    while stack:
+        node,parent,depth = stack.pop()
+        subgroup_objects.append({
+            'subgroup_id':group_id,
+            'subgroup_texts':node.children_ids,
+            'subgroup_user_locs':node.user_locs,
+            'subgroup_centroid':node.centroid,
+            'subgroup_span':node.cutoff,
+            'subgroup_parent':parent,
+            'subgroup_depth':depth,
+        })
+        for uid in getattr(node, "user_ids", []):
+            _append_to_df(uid, group_id)
+        for gi in node.children_ids:
+            _append_to_df(ids[int(gi)], group_id)
+        for subgroup in node.subgroups:
+            stack.append((subgroup,group_id, depth+1))
+        group_id += 1
+    subgroups_df = pd.DataFrame.from_records(subgroup_objects)
+    print(subgroups_df.head())
+
+
+
+
       # plt.figure(figsize=(12, 6))
       # dendrogram(linkage_matrix, truncate_mode="level", p=7)  # Show only top 5 levels
       # plt.title("Agglomerative Clustering Dendrogram (Truncated)")
