@@ -472,25 +472,49 @@ async function calculate_metrics(data, postMap, commentMap) {
   return enriched_embeddings;
 }
 
+function classify_post(post) {
+  const selftext = (post.data.selftext || "").trim();
+  const author = post.data.author
+  const isEmptyText = selftext.length === 0;
+  const isDeletedText = selftext === "[deleted]";
+  const isRemovedText = selftext === "[removed]";
+  const isNotValidText = isEmptyText || isDeletedText || isRemovedText
+  const isDeletedAuthor = author == "[deleted]"
+  const isAutoModAuthor = author == "AutoModerator"
+  const isLikelyBot = isAutoModAuthor || /bot$/i.test(author || "");
+  const isRepliedTo = post.data.num_comments > 0;
+  return { isEmptyText, isDeletedText, isRemovedText, isDeletedAuthor, isAutoModAuthor, isLikelyBot, isRepliedTo, isNotValidText }
+}
 async function calculate_post_metrics(post, enriched_embeddings) {
   const post_metrics = {};
+  post_metrics.flags = classify_post(post)
+  if (!post_metrics.flags.isRepliedTo && post_metrics.flags.isDeletedAuthor && post_metrics.flags.isNotValidText) {
+    //The post has no author, text, or comments. It is a non-post.
+    return post_metrics
+  }
+
   post_metrics.num_comments = post.data.num_comments;
   post_metrics.total_direct_replies = post?.comments?.length ?? 0;
   post_metrics.total_upvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : post.data.upvote_ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1));
   post_metrics.total_downvotes = post.data.score == 0 && post.data.upvote_ratio == 0.5 ? 0 : (post.data.upvote_ratio == 0.5 ? Math.round(post.data.score / 2) : Math.round((post.data.score * post.data.upvote_ratio) / (2 * post.data.upvote_ratio - 1))) - post.data.score;
   post_metrics.author = post.data.author;
   post_metrics.author_id = post.data.author_fullname;
-  const text = post.data.title + " " + post.data.selftext;
-  const doc = nlp.readDoc(text);
-  post_metrics.frequency_table = doc.tokens()
-    .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
-    .out(its.lemma, as.freqTable);
-  //TODO - Chunk Texts.
-  post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
   post_metrics.id = post.data.name;
-  const embedding = await embeddings(text, { pooling: 'mean', normalize: true });
-  enriched_embeddings.embeddings[post.data.name] = embedding;
-  enriched_embeddings.texts[post.data.name] = text
+
+  if (!post_metrics.flags.isNotValidText) {
+    //We only send real strings to embedding, etc. This means not all posts have embeddings and texts.
+    const text = post.data.title + " " + post.data.selftext;
+    const doc = nlp.readDoc(text);
+    post_metrics.frequency_table = doc.tokens()
+      .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+      .out(its.lemma, as.freqTable);
+    post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
+    const embedding = await embeddings(text, { pooling: 'mean', normalize: true });
+    enriched_embeddings.embeddings[post.data.name] = embedding;
+    enriched_embeddings.texts[post.data.name] = text
+  }
+
+
   return post_metrics;
 }
 
@@ -502,46 +526,65 @@ async function calculate_comments_metrics(comments, post_fullname, enriched_embe
   }
   return comments_metrics;
 }
-
+function classify_comment(comment) {
+  const text = (comment.data.body || "").trim();
+  const author = comment.data.author;
+  const isEmptyText = text.length === 0;
+  const isDeletedText = text === "[deleted]";
+  const isRemovedText = text === "[removed]";
+  const isDeletedAuthor = author === "[deleted]";
+  const isAutoModAuthor = author === "AutoModerator";
+  const isLikelyBot = isAutoModAuthor || /bot$/i.test(author || "");
+  const isNotValidText = isEmptyText || isDeletedText || isRemovedText;
+  const isRepliedTo = comment.data?.replies?.data?.children?.length ?? 0 > 0;
+  return { isEmptyText, isDeletedText, isRemovedText, isDeletedAuthor, isAutoModAuthor, isLikelyBot, isNotValidText, isRepliedTo }
+}
 async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings) {
   logStage('COMMENT_FLATTEN', `Flattening comment ${comment.data.id}, parent ${comment.data.parent_id}`);
 
   const comment_metrics = {};
+  comment_metrics.flags = classify_comment(comment)
+
   const text = comment.data.body;
-  const isUsableText =
-    text.length > 0 &&
-    text !== "[deleted]" &&
-    text !== "[removed]";
 
   comment_metrics.id = comment.data.name;
   comment_metrics.post_id = post_fullname;
   comment_metrics.author = comment.data.author;
   comment_metrics.author_id = comment.data.author_fullname;
-  const embedding = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
-  comment_metrics.sentiment = await sentiment_chunker_and_aggregator(comment.data.body);
-  comment_metrics.frequency_table = nlp.readDoc(text).tokens()
-    .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
-    .out(its.lemma, as.freqTable);
   comment_metrics.replied_to = comment.data.parent_id;
   comment_metrics.direct_reply_count = comment.data?.replies?.data?.children?.length ?? 0;
   comment_metrics.score = comment.data.score;
   comment_metrics.upvotes = comment.data.ups;
   comment_metrics.estimated_downvotes = comment.data.ups - comment.data.score
   comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
-  if (comment.data.replies && comment.data?.replies?.children?.length) {
+  if (!comment_metrics.flags.isNotValidText) {
+    const embedding = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
+    comment_metrics.sentiment = await sentiment_chunker_and_aggregator(comment.data.body);
+    comment_metrics.frequency_table = nlp.readDoc(text).tokens()
+      .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
+      .out(its.lemma, as.freqTable);
+
+    enriched_embeddings.embeddings[comment.data.name] = embedding;
+    enriched_embeddings.texts[comment.data.name] = comment.data.body;
+  }
+
+  comments_metrics.push(comment_metrics);
+
+  if (comment_metrics.flags.isRepliedTo) {
     for (const child of comment.data.replies.data.children) {
       await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id, enriched_embeddings);
     }
   }
-  comments_metrics.push(comment_metrics);
-  enriched_embeddings.embeddings[comment.data.name] = embedding;
-  enriched_embeddings.texts[comment.data.name] = comment.data.body;
 }
 
 function reduce_post(post_metrics, enriched_embeddings) {
+  if (!post_metrics.id) {
+    return
+  }
   const { users, words } = enriched_embeddings
   logStage('REDUCE_POST', `Reducing post: ${post_metrics.id} by ${post_metrics.author}`);
   // Reduce user Summaries
+
   const author_id = post_metrics.author_id
   let user;
   if (!users[author_id]) {
@@ -579,59 +622,61 @@ function reduce_post(post_metrics, enriched_embeddings) {
     user.text_ids.push(post_metrics.id);
     user.total_comments_on_posts += post_metrics.num_comments;
   }
-  switch (post_metrics.sentiment.label) {
-    case 'POSITIVE':
-      user.positive_sentiment_texts++;
-      break;
-    case 'NEGATIVE':
-      user.negative_sentiment_texts++;
-      break;
-    case 'NEUTRAL':
-      user.neutral_sentiment_texts++;
-      break;
-  }
-
-  for (const word of post_metrics.frequency_table) {
-    let this_word;
-    if (!user.words[word[0]]) {
-      this_word = {
-        unique_texts: 1,
-        frequency: word[1],
-        negative_sentiment_freq: 0,
-        positive_sentiment_freq: 0,
-        neutral_sentiment_freq: 0,
-      }
-      user.words[word[0]] = this_word;
-    } else {
-      this_word = user.words[word[0]];
-      this_word.unique_texts++;
-      this_word.frequency += word[1];
-    }
-
-    let global_word;
-    if (!words[word[0]]) {
-      global_word = { ...this_word, users: [post_metrics.author_id], texts: [post_metrics.id] };
-      words[word[0]] = global_word;
-    } else {
-      global_word = words[word[0]];
-      global_word.frequency += this_word.frequency;
-      global_word.unique_texts++;
-      global_word.users.push(post_metrics.author_id);
-      global_word.texts.push(post_metrics.id);
-    }
+  if (!post_metrics.flags.isNotValidText) {
     switch (post_metrics.sentiment.label) {
       case 'POSITIVE':
-        this_word.positive_sentiment_freq += word[1];
-        global_word.positive_sentiment_freq += word[1];
+        user.positive_sentiment_texts++;
         break;
       case 'NEGATIVE':
-        this_word.negative_sentiment_freq += word[1];
-        global_word.negative_sentiment_freq += word[1];
+        user.negative_sentiment_texts++;
         break;
       case 'NEUTRAL':
-        this_word.neutral_sentiment_freq += word[1];
-        global_word.neutral_sentiment_freq += word[1];
+        user.neutral_sentiment_texts++;
         break;
+    }
+
+    for (const word of post_metrics.frequency_table) {
+      let this_word;
+      if (!user.words[word[0]]) {
+        this_word = {
+          unique_texts: 1,
+          frequency: word[1],
+          negative_sentiment_freq: 0,
+          positive_sentiment_freq: 0,
+          neutral_sentiment_freq: 0,
+        }
+        user.words[word[0]] = this_word;
+      } else {
+        this_word = user.words[word[0]];
+        this_word.unique_texts++;
+        this_word.frequency += word[1];
+      }
+
+      let global_word;
+      if (!words[word[0]]) {
+        global_word = { ...this_word, users: [post_metrics.author_id], texts: [post_metrics.id] };
+        words[word[0]] = global_word;
+      } else {
+        global_word = words[word[0]];
+        global_word.frequency += this_word.frequency;
+        global_word.unique_texts++;
+        global_word.users.push(post_metrics.author_id);
+        global_word.texts.push(post_metrics.id);
+      }
+      switch (post_metrics.sentiment.label) {
+        case 'POSITIVE':
+          this_word.positive_sentiment_freq += word[1];
+          global_word.positive_sentiment_freq += word[1];
+          break;
+        case 'NEGATIVE':
+          this_word.negative_sentiment_freq += word[1];
+          global_word.negative_sentiment_freq += word[1];
+          break;
+        case 'NEUTRAL':
+          this_word.neutral_sentiment_freq += word[1];
+          global_word.neutral_sentiment_freq += word[1];
+          break;
+      }
     }
   }
   enriched_embeddings.posts[post_metrics.id] = post_metrics;
@@ -640,7 +685,10 @@ function reduce_post(post_metrics, enriched_embeddings) {
 function reduce_comments(comments_metrics, enriched_embeddings, postMap, commentMap) {
   const { users, words } = enriched_embeddings;
   for (const comment of comments_metrics) {
-    logStage('REDUCE_COMMENT', `Reducing comment: ${comment.id} by ${comment.author}`);
+    if (!comment.id) {
+      continue
+    }
+    logStage('REDUCE_COMMENT', `Reducing comment: ${comment.id} by ${comment.author}`)
     // User summaries
     let user;
     if (!users[comment.author_id]) {
@@ -679,7 +727,7 @@ function reduce_comments(comments_metrics, enriched_embeddings, postMap, comment
     }
 
     const parent_post = postMap.get(comment.post_id);
-    const direct_parent = comment.post_id.startsWith("t1_") ? commentMap.get(comment.replied_to) : postMap.get(comment.replied_to);
+    const direct_parent = comment.replied_to.startsWith("t1_") ? commentMap.get(comment.replied_to) : postMap.get(comment.replied_to);
 
     const parent_post_user = users[parent_post.data.author_fullname];
     const direct_parent_user = users[direct_parent.data.author_fullname];
@@ -687,68 +735,70 @@ function reduce_comments(comments_metrics, enriched_embeddings, postMap, comment
     user.users_whose_posts_were_commented_on.push(parent_post_user.author_id);
     parent_post_user.users_who_commented_on_own_post.push(user.author_id)
     direct_parent_user.users_who_replied_to.push(user.author_id)
-
-    switch (comment.sentiment.label) {
-      case 'POSITIVE':
-        user.positive_sentiment_texts++;
-        direct_parent_user.positive_replies++;
-        parent_post_user.positive_comments++;
-        break;
-      case 'NEGATIVE':
-        user.negative_sentiment_texts++;
-        direct_parent_user.negative_replies++;
-        parent_post_user.negative_comments++;
-        break;
-      case 'NEUTRAL':
-        user.neutral_sentiment_texts++;
-        direct_parent_user.neutral_replies++;
-        parent_post_user.neutral_comments++;
-        break;
-    }
-
-    for (const word of comment.frequency_table) {
-      let this_word;
-      if (!user.words[word[0]]) {
-        this_word = {
-          unique_texts: 1,
-          frequency: word[1],
-          negative_sentiment_freq: 0,
-          positive_sentiment_freq: 0,
-          neutral_sentiment_freq: 0,
-        }
-        user.words[word[0]] = this_word;
-      } else {
-        this_word = user.words[word[0]];
-        this_word.unique_texts++;
-        this_word.frequency += word[1];
-      }
-
-      let global_word;
-      if (!words[word[0]]) {
-        global_word = { ...this_word, users: [comment.author_id], texts: [comment.id] };
-        words[word[0]] = global_word;
-      } else {
-        global_word = words[word[0]];
-        global_word.frequency += this_word.frequency;
-        global_word.unique_texts++;
-        global_word.users.push(comment.author_id);
-        global_word.texts.push(comment.id);
-      }
+    if (!comment.flags.isNotValidText) {
       switch (comment.sentiment.label) {
         case 'POSITIVE':
-          this_word.positive_sentiment_freq += word[1];
-          global_word.positive_sentiment_freq += word[1];
+          user.positive_sentiment_texts++;
+          direct_parent_user.positive_replies++;
+          parent_post_user.positive_comments++;
           break;
         case 'NEGATIVE':
-          this_word.negative_sentiment_freq += word[1];
-          global_word.negative_sentiment_freq += word[1];
+          user.negative_sentiment_texts++;
+          direct_parent_user.negative_replies++;
+          parent_post_user.negative_comments++;
           break;
         case 'NEUTRAL':
-          this_word.neutral_sentiment_freq += word[1];
-          global_word.neutral_sentiment_freq += word[1];
+          user.neutral_sentiment_texts++;
+          direct_parent_user.neutral_replies++;
+          parent_post_user.neutral_comments++;
           break;
       }
+
+      for (const word of comment.frequency_table) {
+        let this_word;
+        if (!user.words[word[0]]) {
+          this_word = {
+            unique_texts: 1,
+            frequency: word[1],
+            negative_sentiment_freq: 0,
+            positive_sentiment_freq: 0,
+            neutral_sentiment_freq: 0,
+          }
+          user.words[word[0]] = this_word;
+        } else {
+          this_word = user.words[word[0]];
+          this_word.unique_texts++;
+          this_word.frequency += word[1];
+        }
+
+        let global_word;
+        if (!words[word[0]]) {
+          global_word = { ...this_word, users: [comment.author_id], texts: [comment.id] };
+          words[word[0]] = global_word;
+        } else {
+          global_word = words[word[0]];
+          global_word.frequency += this_word.frequency;
+          global_word.unique_texts++;
+          global_word.users.push(comment.author_id);
+          global_word.texts.push(comment.id);
+        }
+        switch (comment.sentiment.label) {
+          case 'POSITIVE':
+            this_word.positive_sentiment_freq += word[1];
+            global_word.positive_sentiment_freq += word[1];
+            break;
+          case 'NEGATIVE':
+            this_word.negative_sentiment_freq += word[1];
+            global_word.negative_sentiment_freq += word[1];
+            break;
+          case 'NEUTRAL':
+            this_word.neutral_sentiment_freq += word[1];
+            global_word.neutral_sentiment_freq += word[1];
+            break;
+        }
+      }
     }
+
     enriched_embeddings.comments[comment.id] = comment
   }
 }
@@ -874,11 +924,18 @@ function logStage(stage, details = '') {
 }
 
 function stack_average_user_embeddings(enriched_embeddings) {
-  const { users } = enriched_embeddings;
+  const { users, embeddings } = enriched_embeddings;
   for (const [user_id, user] of Object.entries(users)) {
-    const text_embeddings = user.text_ids.map((id) => {
-      return enriched_embeddings.embeddings[id]
-    })
+    const text_embeddings = []
+    for (const text_id of user.text_ids) {
+      const embedding = embeddings[text_id]
+      if (embedding) {
+        text_embeddings.push(embedding)
+      }
+    }
+    if (text_embeddings.length == 0) {
+      continue
+    }
     if (text_embeddings.length == 1) {
       user.only_one_text = true;
     } else {
@@ -904,6 +961,7 @@ function write_to_json(enriched_embeddings) {
   enriched_embeddings.embeddings = embeddings_serialized;
   writeFileSync('data.json', JSON.stringify(enriched_embeddings));
 }
+
 function call_python_scripts() {
 
 }

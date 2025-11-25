@@ -66,7 +66,6 @@ def frequency_table_to_vector(word_data, word_to_index, vocab_size):
             print("This word is not in our global word vector" + word)
   return vec
 
-
 def calculate_word_vectors(data):
   users = data['users']
   posts = data ['posts']
@@ -438,7 +437,6 @@ What should we call this group? Respond with only 1-4 words.
     # The name of the reddit, the name of the supergroup (if any), what words are commonly used or not used in the reddit, and the texts of our 3-5 exemplars
     # We'll request a label which is 1-3 words long and is descriptive.
     return
-
 
 def find_exemplar_texts(data,embedding_matrix):
     subgroups_df = data['subgroups']
