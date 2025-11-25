@@ -62,7 +62,7 @@ def calculate_word_vectors(data):
   posts = data ['posts']
   comments = data['comments']
   words = data['words']
-  vocab_index = words.index.tolist()  # If you already have a column index, use that
+  vocab_index = words.index.tolist()
   vocab_size = len(vocab_index)
   word_to_index = {word: idx for idx, word in enumerate(vocab_index)}
   print(len(word_to_index))
@@ -322,6 +322,8 @@ def clustering_labeling(data):
         sort_user_into_hierarchy(user_embedding, i, subgroup_tree,id)
       make_subgroup_df(subgroup_tree,data)
       find_word_count_differences(data)
+      find_exemplar_texts(data,pca_reduced_embeddings)
+
       return
 
 def make_subgroup_df(subgroup_tree, data):
@@ -368,21 +370,92 @@ def make_subgroup_df(subgroup_tree, data):
     data['subgroups'] = subgroups_df
     print(subgroups_df.head())
 
-def generate_labels(data):
-    #We'll find exemplar texts
-    #find the word count differences between groups, and several used/non-used words
+def generate_labels(data,embedding_matrix):
     #We'll use these to produce a structured query for a local llm.
     #The query will include
     # The name of the reddit, the name of the supergroup (if any), what words are commonly used or not used in the reddit, and the texts of our 3-5 exemplars
     # We'll request a label which is 1-3 words long and is descriptive.
     return
 
-def find_exemplar_texts(link_tree,data):
-    # In our list of texts, we want to find their distances from the centroid.
-    # An exemplar is either - A, one of the texts which is most close to the centroid
-    # B A text which is in the top half in terms of distance from the centroid, and has higher engagement than other points
-    # Engagement can either be upvotes or comments/replies
-    # if one text is all of these things, we'll find a few more.
+
+def find_exemplar_texts(data,embedding_matrix):
+    subgroups_df = data['subgroups']
+    ids = np.array(data['embedding_ids'])
+    comments_df = data["comments"]
+    posts_df = data["posts"]
+
+    def get_metrics(id_str):
+        up = 0.0
+        dr = 0.0
+        if id_str.startswith("t3_"):  # post
+            if id_str in posts_df.index:
+                row = posts_df.loc[id_str]
+                up = float(row.get("total_upvotes", row.get("score", 0.0)))
+                dr = float(row.get("total_direct_replies", row.get("num_comments", 0.0)))
+
+        elif id_str.startswith("t1_"):  # comment
+            if id_str in comments_df.index:
+                row = comments_df.loc[id_str]
+                up = float(row.get("upvotes", row.get("score", 0.0)))
+                dr = float(row.get("direct_reply_count", 0.0))
+        return up, dr
+    subgroup_exemplars = []
+    for subgroup in subgroups_df.itertuples(index=False):
+        text_locs =  np.array(subgroup.subgroup_texts, dtype=int)
+        centroid = np.array(subgroup.subgroup_centroid)
+
+        subgroup_vectors = embedding_matrix[text_locs]
+        distances = np.linalg.norm(subgroup_vectors-centroid, axis=1)
+        order_by_centrality = np.argsort(distances)
+        sorted_locs = text_locs[order_by_centrality]
+        n = len(sorted_locs)
+
+        conformant_locs = sorted_locs[:n//2]
+        conformant_ids = ids[conformant_locs]
+        exemplar_most_typical_text_loc = conformant_locs[0]
+        direct_replies = []
+        upvotes = []
+        for cid in conformant_ids:
+            up, dr = get_metrics(cid)
+            upvotes.append(up)
+            direct_replies.append(dr)
+        upvotes = np.array(upvotes)
+        direct_replies = np.array(direct_replies)
+
+        up_order = np.argsort(-upvotes)
+        if conformant_locs[up_order[0]] == exemplar_most_typical_text_loc:
+            exemplar_most_upvotes_loc = conformant_locs[up_order[1]]
+        else:
+            exemplar_most_upvotes_loc = conformant_locs[up_order[0]]
+        dr_order = np.argsort(-direct_replies)
+        if conformant_locs[dr_order[0]] == exemplar_most_typical_text_loc or conformant_locs[dr_order[0]] == exemplar_most_upvotes_loc:
+            if conformant_locs[dr_order[1]] == exemplar_most_typical_text_loc or conformant_locs[dr_order[1]] == exemplar_most_upvotes_loc:
+                exemplar_most_replies = conformant_locs[dr_order[2]]
+            else:
+                exemplar_most_replies = conformant_locs[dr_order[1]]
+        else:
+            exemplar_most_replies = conformant_locs[dr_order[0]]
+        exemplar_tuple = (
+            ("centrality", ids[exemplar_most_typical_text_loc]),
+            ("upvotes", ids[exemplar_most_upvotes_loc]),
+            ("direct replies", ids[exemplar_most_replies]),
+        )
+        subgroup_exemplars.append(exemplar_tuple)
+    subgroups_df["subgroup_exemplars"] = subgroup_exemplars
+    texts_map = data["texts"]
+    #Just a little print for sanity:
+    for i, row in subgroups_df.iterrows():
+        print(f"\n=== SUBGROUP {i} ===")
+
+        exemplars = row.subgroup_exemplars  # tuple of (role, id)
+        for role, ex_id in exemplars:
+            if ex_id is None:
+                continue  # in case some exemplar slot couldn't be filled
+
+            text = texts_map.get(ex_id, "[NO TEXT FOUND]")
+            print(f"{role}: {ex_id}")
+            print(text[:400])  # show first 400 chars
+            print("-" * 40)
     return
 
 def find_word_count_differences(data):
@@ -397,6 +470,7 @@ def find_word_count_differences(data):
     summaries = []
     all_idx = (subgroups_df["subgroup_texts"]
                .explode().dropna().astype(int).unique())
+
     def _get_word_vector(gi):
         id_str = ids[gi]
         if id_str.startswith("t1_"):
@@ -428,9 +502,6 @@ def find_word_count_differences(data):
         for word in top5:
             print(vocab[word])
 
-
-
-
 def weighted_log_odds_z(y1, y_global, alpha=10.0):
     # y1: subgroup counts (V,)
     # y_global: global counts (V,)
@@ -455,81 +526,10 @@ def weighted_log_odds_z(y1, y_global, alpha=10.0):
 
 
 
-    # we should gather, summarize, and normalize the word counts between each of the different groups.
-    # We should also have a normalized form of the entire subreddit wordcount.
-    # The difference between the normalized form and the entire subreddit is the "Difference"
-    # Then, for each subreddit we should find the words with the largest and smallest values - these are our summary.
-    # Do we want to do any kind of elbow method here?
-    # What about weighting by engagement?
+
 
 
 
 data = load_enriched_embeddings()
 calculate_word_vectors(data)
 clustering_labeling(data)
-
-
-
-      # max_score = 0
-      # top_cluster_count = 0
-      # best_clusterer = None
-      # best_labels = None
-      # for k in range(2, 7):
-      #   clusterer = AgglomerativeClustering(n_clusters=k, linkage='ward')
-      #   labels = clusterer.fit_predict(pca_reduced_embeddings)
-      #   score = silhouette_score(pca_reduced_embeddings, labels)
-      #   if score > max_score:
-      #       best_clusterer = clusterer
-      #       best_labels = labels
-      #       max_score = score
-      #       top_cluster_count = k
-      #   # print (best_clusterer.n_leaves_)
-      #   # print(top_cluster_count)
-      #   # print(max_score)
-      #   mapper = umap.UMAP().fit(pca_reduced_embeddings)
-      #   umap.plot.points(mapper, labels=best_labels, color_key_cmap='Spectral')
-      #   plt.show()
-      #   sil_scores = silhouette_samples(pca_reduced_embeddings, labels)
-      #   df = pd.DataFrame({
-      #       'id': data['embedding_ids'],
-      #       'label': labels,
-      #       'silhouette': sil_scores
-      #   })
-        # print(df['label'].value_counts())
-        # top_ids_per_cluster = (
-        #     df.sort_values('silhouette', ascending=False)
-        #       .groupby('label')
-        #       .head(5)
-        # )
-        # merged = top_ids_per_cluster.merge(texts_df, on='id', how='left')
-        # print(merged[['label', 'silhouette', 'id', 'text']])
-
-
-      # print(embedding_matrix.shape)
-
-      # scores = []
-      # cluster_range = range(2, 7)  # try from 2 to 14 clusters
-
-
-
-
-      # plt.plot(cluster_range, scores, marker='o')
-      # plt.xlabel("Number of clusters")
-      # plt.ylabel("Silhouette Score")
-      # plt.title("Silhouette Scores for Different Cluster Counts")
-      # plt.show()
-
-      # afp = AffinityPropagation(preference=preference)
-      # afp.fit(pca_reduced_embeddings)
-      # exemplar_indices = afp.cluster_centers_indices_
-      # exemplar_labels = afp.labels_
-      # exemplars = [pca_reduced_embeddings[i] for i in exemplar_indices]
-      # print(f"\n[INFO] Total clusters: {len(exemplar_indices)}")
-      # print("[INFO] Exemplar IDs (data points that represent each cluster):")
-      # for idx, eid in enumerate(exemplars):
-      #   print(f"  Cluster {idx}: ID {eid}")
-
-
-      # mapper = umap.UMAP().fit(pca_reduced_embeddings)
-      # umap.plot.points(mapper, labels=afp.labels_, color_key_cmap='Spectral')
-      # plt.show()
