@@ -508,6 +508,11 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
 
   const comment_metrics = {};
   const text = comment.data.body;
+  const isUsableText =
+    text.length > 0 &&
+    text !== "[deleted]" &&
+    text !== "[removed]";
+
   comment_metrics.id = comment.data.name;
   comment_metrics.post_id = post_fullname;
   comment_metrics.author = comment.data.author;

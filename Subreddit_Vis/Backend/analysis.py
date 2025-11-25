@@ -15,6 +15,20 @@ from numpy.linalg import pinv
 from numpy import quantile
 from scipy.spatial import ConvexHull
 from matplotlib.patches import Polygon
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+LOCAL_PATH = "./models/phi-3.5-mini-instruct"
+
+tokenizer = AutoTokenizer.from_pretrained(LOCAL_PATH, trust_remote_code=False)
+model = AutoModelForCausalLM.from_pretrained(
+    LOCAL_PATH,
+    device_map="auto",
+    dtype=torch.float16,
+    trust_remote_code=False,
+    attn_implementation="eager"
+)
+
 def load_enriched_embeddings(path="./data.json"):
   p=Path(path)
   with p.open("r", encoding="utf-8") as f:
@@ -100,27 +114,30 @@ def init_valid_flags(node):
   if not node.is_leaf():
     init_valid_flags(node.left)
     init_valid_flags(node.right)
+MIN_SUBGROUP_SIZE = 7
 
+def big_enough(node):
+    return len(node.children) >= MIN_SUBGROUP_SIZE
 def compare_subgroups(node, pca_reduced_embeddings):
     init_valid_flags(node)
-    node.valid_subgroup = True
+    node.valid_subgroup = big_enough(node)
     inner_silhouette_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.children])
     break_left_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.left.children,node.left.right.children,node.right.children])
     break_right_score = compute_silhouette_score(pca_reduced_embeddings, [node.left.children, node.right.left.children, node.right.right.children])
     if inner_silhouette_score > break_right_score:
-        node.right.valid_subgroup = True
+        node.right.valid_subgroup = big_enough(node.right)
         pop_subgroups(node.right,node.right,node.left,pca_reduced_embeddings)
     else:
-        node.right.left.valid_subgroup = True
-        node.right.right.valid_subgroup = True
+        node.right.left.valid_subgroup = big_enough(node.right.left)
+        node.right.right.valid_subgroup = big_enough(node.right.right)
         pop_subgroups(node.right.left, node.right.left,node.right.right, pca_reduced_embeddings)
         pop_subgroups(node.right.right, node.right.right,node.right.left, pca_reduced_embeddings)
     if inner_silhouette_score > break_left_score:
-        node.left.valid_subgroup = True
+        node.left.valid_subgroup =big_enough(node.left)
         pop_subgroups(node.left, node.left,node.right, pca_reduced_embeddings)
     else:
-        node.left.left.valid_subgroup = True
-        node.left.right.valid_subgroup = True
+        node.left.left.valid_subgroup = big_enough(node.left.left)
+        node.left.right.valid_subgroup = big_enough(node.left.right)
         pop_subgroups(node.left.right,node.left.right,node.left.left, pca_reduced_embeddings)
         pop_subgroups(node.left.left, node.left.left,node.left.right, pca_reduced_embeddings)
 
@@ -149,13 +166,13 @@ def pop_subgroups(node,ancestor,uncle,pca_reduced_embeddings):
         node.left.valid_subgroup = False
         pop_subgroups(node.left,ancestor,uncle,pca_reduced_embeddings)
     else:
-        node.left.valid_subgroup = True
+        node.left.valid_subgroup = big_enough(node.left)
         pop_subgroups(node.left,node.left, node.right, pca_reduced_embeddings)
     if ancestor_score > right_score:
         node.right.valid_subgroup = False
         pop_subgroups(node.right, ancestor, uncle, pca_reduced_embeddings)
     else:
-        node.right.valid_subgroup = True
+        node.right.valid_subgroup = big_enough(node.right)
         pop_subgroups(node.right,node.right,node.left,pca_reduced_embeddings)
     return
 
@@ -323,7 +340,7 @@ def clustering_labeling(data):
       make_subgroup_df(subgroup_tree,data)
       find_word_count_differences(data)
       find_exemplar_texts(data,pca_reduced_embeddings)
-
+      generate_labels(data)
       return
 
 def make_subgroup_df(subgroup_tree, data):
@@ -370,7 +387,60 @@ def make_subgroup_df(subgroup_tree, data):
     data['subgroups'] = subgroups_df
     print(subgroups_df.head())
 
-def generate_labels(data,embedding_matrix):
+def generate_labels(data):
+    subgroups_df = data['subgroups']
+    texts = data['texts']
+    subgroup_labels = []
+    for subgroup in subgroups_df.itertuples(index=False):
+        log_odds = np.array(subgroup.wlogodds_z)
+        order = np.argsort(log_odds)
+        top10 = order[-10:][::-1]
+        bottom10 = order[10:]
+        vocab = data["words"].index.tolist()
+        top_words = [vocab[i] for i in top10]
+        bottom_words = [vocab[i] for i in bottom10]
+        ((cent_label, cent_id),
+        (up_label, up_id),
+        (rep_label, rep_id)) = subgroup.subgroup_exemplars
+        prompt = f"""
+You are naming a language subgroup from Reddit.
+These are examples of typical texts
+1) This text was very typical for the group{texts[cent_id]}
+2) This text had a lot of upvotes {texts[up_id]}
+3) this text had many responses{texts[rep_id]}
+
+The group used these words more than others in the subreddit: {", ".join(top_words)
+                                            }
+The group used these words less than other in the subreddit: {", ".join(bottom_words)}
+
+Return a short descriptive name (<=4 words). Only the name.
+"""
+
+        chat = [{"role":"user", "content": prompt}]
+
+        enc = tokenizer.apply_chat_template(
+            chat,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True      # <-- gives attention_mask
+        )
+
+        enc = {k: v.to(model.device) for k, v in enc.items()}
+
+        with torch.no_grad():
+            out = model.generate(
+                **enc,
+                max_new_tokens=12,
+                do_sample=False,   # deterministic
+                use_cache=False    # extra safety for Phi cache edge cases
+            )
+
+        raw = tokenizer.decode(out[0], skip_special_tokens=True).strip()
+        label = raw.splitlines()[-1].strip()
+        print("Subgroup label generated:", label)
+
+    # take last line as the "answer"
+
     #We'll use these to produce a structured query for a local llm.
     #The query will include
     # The name of the reddit, the name of the supergroup (if any), what words are commonly used or not used in the reddit, and the texts of our 3-5 exemplars
