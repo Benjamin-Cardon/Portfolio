@@ -18,16 +18,12 @@ from matplotlib.patches import Polygon
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
-LOCAL_PATH = "./models/phi-3.5-mini-instruct"
+LOCAL_PATH = "./models/gemma-2b-it"
 
-tokenizer = AutoTokenizer.from_pretrained(LOCAL_PATH, trust_remote_code=False)
-model = AutoModelForCausalLM.from_pretrained(
-    LOCAL_PATH,
+tokenizer = AutoTokenizer.from_pretrained(LOCAL_PATH,)
+model = AutoModelForCausalLM.from_pretrained(LOCAL_PATH,
     device_map="auto",
-    dtype=torch.float16,
-    trust_remote_code=False,
-    attn_implementation="eager"
-)
+    torch_dtype=torch.float16)
 
 def load_enriched_embeddings(path="./data.json"):
   p=Path(path)
@@ -395,7 +391,7 @@ def generate_labels(data):
         log_odds = np.array(subgroup.wlogodds_z)
         order = np.argsort(log_odds)
         top10 = order[-10:][::-1]
-        bottom10 = order[10:]
+        bottom10 = order[:10]
         vocab = data["words"].index.tolist()
         top_words = [vocab[i] for i in top10]
         bottom_words = [vocab[i] for i in bottom10]
@@ -403,40 +399,36 @@ def generate_labels(data):
         (up_label, up_id),
         (rep_label, rep_id)) = subgroup.subgroup_exemplars
         prompt = f"""
-You are naming a language subgroup from Reddit.
-These are examples of typical texts
-1) This text was very typical for the group{texts[cent_id]}
-2) This text had a lot of upvotes {texts[up_id]}
-3) this text had many responses{texts[rep_id]}
+You are an expert at naming Reddit subgroups. Based on example texts from the subgroup, and a list of words that are used more or less commonly in that group compared to the whole population, Return a short descriptive name (<=4 words). Only the name.
+1) This text was very typical for the subgroup: '{texts[cent_id]}'
+2) This text had a lot of upvotes '{texts[up_id]}'
+3) this text had many responses: '{texts[rep_id]}'
 
 The group used these words more than others in the subreddit: {", ".join(top_words)
                                             }
 The group used these words less than other in the subreddit: {", ".join(bottom_words)}
-
-Return a short descriptive name (<=4 words). Only the name.
+What should we call this group? Respond with only 1-4 words.
 """
-
-        chat = [{"role":"user", "content": prompt}]
-
+        messages = [
+            {"role": "user", "content": prompt},
+        ]
         enc = tokenizer.apply_chat_template(
-            chat,
+            messages,
             add_generation_prompt=True,
             return_tensors="pt",
-            return_dict=True      # <-- gives attention_mask
+            return_dict=True,
         )
-
         enc = {k: v.to(model.device) for k, v in enc.items()}
 
-        with torch.no_grad():
-            out = model.generate(
-                **enc,
-                max_new_tokens=12,
-                do_sample=False,   # deterministic
-                use_cache=False    # extra safety for Phi cache edge cases
-            )
-
-        raw = tokenizer.decode(out[0], skip_special_tokens=True).strip()
-        label = raw.splitlines()[-1].strip()
+        outputs = model.generate(
+            **enc,
+            max_new_tokens=12,
+            do_sample=False,
+        )
+        input_len = enc["input_ids"].shape[1]
+        gen_tokens = outputs[0, input_len:]
+        raw = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
+        label = raw.splitlines()[0].strip()
         print("Subgroup label generated:", label)
 
     # take last line as the "answer"
