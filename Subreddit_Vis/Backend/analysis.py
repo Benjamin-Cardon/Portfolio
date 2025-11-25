@@ -50,6 +50,8 @@ def load_enriched_embeddings(path="./data.json"):
 
 def user_words_to_vector(word_data, word_to_index, vocab_size):
   vec = np.zeros(vocab_size, dtype=np.float32)
+  if not isinstance(word_data, dict):
+      return vec
   for word, info in word_data.items():
           if word in word_to_index:
             vec[word_to_index[word]] = info.get('frequency', 0)
@@ -59,6 +61,8 @@ def user_words_to_vector(word_data, word_to_index, vocab_size):
 
 def frequency_table_to_vector(word_data, word_to_index, vocab_size):
   vec = np.zeros(vocab_size, dtype=np.float32)
+  if not isinstance(word_data, dict):
+        return vec
   for word, count in word_data:
           if word in word_to_index:
             vec[word_to_index[word]] = count
