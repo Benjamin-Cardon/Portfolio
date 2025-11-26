@@ -70,8 +70,24 @@ def identify_bots(data):
             # choose whatever identifier you use for users:
             # e.g. row.user_id, row.username, row.id, etc.
             confirmed_bots.append(row.user_id)
+    data['users']['is_bot'] = False
     data['users'].loc[data['users']['user_id'].isin(confirmed_bots), 'is_bot'] = True
 
+def calculate_word_vectors(data):
+  users = data['users']
+  posts = data ['posts']
+  comments = data['comments']
+  words = data['words']
+  vocab_index = words.index.tolist()
+  vocab_size = len(vocab_index)
+  word_to_index = {word: idx for idx, word in enumerate(vocab_index)}
+  print(len(word_to_index))
+  users['word_count_vector'] = users['words'].apply(lambda wd: user_words_to_vector(wd, word_to_index, vocab_size))
+  comments['word_count_vector'] = comments['frequency_table'].apply(lambda wd: frequency_table_to_vector(wd,word_to_index, vocab_size))
+  posts['word_count_vector'] = posts['frequency_table'].apply(lambda wd:frequency_table_to_vector(wd,word_to_index,vocab_size))
+  data['global_word_vector']  = words['frequency'].reindex(vocab_index).to_numpy(dtype=np.float32)
+
+  return
 
 def user_words_to_vector(word_data, word_to_index, vocab_size):
   vec = np.zeros(vocab_size, dtype=np.float32)
@@ -95,21 +111,36 @@ def frequency_table_to_vector(word_data, word_to_index, vocab_size):
             print("This word is not in our global word vector" + word)
   return vec
 
-def calculate_word_vectors(data):
-  users = data['users']
-  posts = data ['posts']
-  comments = data['comments']
-  words = data['words']
-  vocab_index = words.index.tolist()
-  vocab_size = len(vocab_index)
-  word_to_index = {word: idx for idx, word in enumerate(vocab_index)}
-  print(len(word_to_index))
-  users['word_count_vector'] = users['words'].apply(lambda wd: user_words_to_vector(wd, word_to_index, vocab_size))
-  comments['word_count_vector'] = comments['frequency_table'].apply(lambda wd: frequency_table_to_vector(wd,word_to_index, vocab_size))
-  posts['word_count_vector'] = posts['frequency_table'].apply(lambda wd:frequency_table_to_vector(wd,word_to_index,vocab_size))
-  data['global_word_vector']  = words['frequency'].reindex(vocab_index).to_numpy(dtype=np.float32)
+def clustering(data):
+      embedding_matrix = data['embedding_matrix']
+      ids = data['embedding_ids']
+      is_comment = np.char.startswith(ids, 't1_')
+      is_post    = np.char.startswith(ids, 't3_')
+      is_user = np.char.startswith(ids, 't2_')
+      is_text    = is_comment | is_post
 
-  return
+      pca = PCA(n_components=0.8, svd_solver='full')
+      pca_reduced_embeddings = pca.fit_transform(embedding_matrix)
+
+      text_idx = np.where(is_text)[0]
+
+      linkage_matrix = linkage(pca_reduced_embeddings[text_idx], method="ward")
+      link_tree = to_tree(linkage_matrix)
+
+      recursive_children_decorator(link_tree, text_idx)
+      compare_subgroups(link_tree, pca_reduced_embeddings)
+      subgroup_tree = subgroup_hierarchy_tree(link_tree, pca_reduced_embeddings)
+      visualize_subgroups_with_umap(data, subgroup_tree)
+      user_idx = np.where(is_user)[0]
+
+      for i in user_idx:
+        id = ids[i]
+        subgroup_tree.user_ids.append(id)
+        subgroup_tree.user_locs.append(i)
+        user_embedding = pca_reduced_embeddings[i]
+        sort_user_into_hierarchy(user_embedding, i, subgroup_tree,id)
+
+      return (subgroup_tree, pca_reduced_embeddings)
 
 def recursive_children_decorator(node,id_map):
     if node.is_leaf():
@@ -122,26 +153,6 @@ def recursive_children_decorator(node,id_map):
         node.children = all_children
         return all_children
 
-def compute_silhouette_score(pca_embeddings, id_groups):
-    all_ids = [idx for group in id_groups for idx in group]
-    subset = pca_embeddings[all_ids]
-    labels = np.concatenate([
-        np.full(len(group), i) for i, group in enumerate(id_groups)
-    ])
-    if len(np.unique(labels)) < 2:
-        return None  # Silhouette needs at least 2 distinct labels
-
-    return silhouette_score(subset, labels)
-
-def init_valid_flags(node):
-  node.valid_subgroup = False
-  if not node.is_leaf():
-    init_valid_flags(node.left)
-    init_valid_flags(node.right)
-MIN_SUBGROUP_SIZE = 7
-
-def big_enough(node):
-    return len(node.children) >= MIN_SUBGROUP_SIZE
 def compare_subgroups(node, pca_reduced_embeddings):
     init_valid_flags(node)
     node.valid_subgroup = big_enough(node)
@@ -165,12 +176,21 @@ def compare_subgroups(node, pca_reduced_embeddings):
         pop_subgroups(node.left.right,node.left.right,node.left.left, pca_reduced_embeddings)
         pop_subgroups(node.left.left, node.left.left,node.left.right, pca_reduced_embeddings)
 
-def check_other_splitting_conditions(node):
-    if len(node.children) < 7:
-        return False
-    if node.is_leaf():
-        return False
-    return True
+def compute_silhouette_score(pca_embeddings, id_groups):
+    all_ids = [idx for group in id_groups for idx in group]
+    subset = pca_embeddings[all_ids]
+    labels = np.concatenate([
+        np.full(len(group), i) for i, group in enumerate(id_groups)
+    ])
+    if len(np.unique(labels)) < 2:
+        return None  # Silhouette needs at least 2 distinct labels
+
+    return silhouette_score(subset, labels)
+
+MIN_SUBGROUP_SIZE = 7
+
+def big_enough(node):
+    return len(node.children) >= MIN_SUBGROUP_SIZE
 
 def pop_subgroups(node,ancestor,uncle,pca_reduced_embeddings):
     if not check_other_splitting_conditions(node):
@@ -200,6 +220,69 @@ def pop_subgroups(node,ancestor,uncle,pca_reduced_embeddings):
         pop_subgroups(node.right,node.right,node.left,pca_reduced_embeddings)
     return
 
+def check_other_splitting_conditions(node):
+    if len(node.children) < 7:
+        return False
+    if node.is_leaf():
+        return False
+    return True
+
+def subgroup_hierarchy_tree(link_tree, embedding_matrix):
+
+    root = Subgroup_Node(None,link_tree.children,embedding_matrix)
+    traverse_link_tree(link_tree.left,root,embedding_matrix)
+    traverse_link_tree(link_tree.right,root,embedding_matrix)
+    return root
+
+class Subgroup_Node:
+    def __init__(self, parent, children_ids,embedding_matrix):
+        self.parent = parent
+        self.subgroups = []
+        self.user_locs = []
+        self.user_ids=[]
+        self.children_ids = children_ids
+        cluster_points = embedding_matrix[children_ids]
+        centroid = cluster_points.mean(axis=0)
+        self.centroid = centroid
+        centered_points = cluster_points - centroid
+        ledoit = LedoitWolf().fit(centered_points)
+        covariance_matrix = ledoit.covariance_
+        inverse_covariance = pinv(covariance_matrix)
+        self.inverse_covariance = inverse_covariance
+        squared_distances_train = np.einsum('ij,jk,ik->i', centered_points, inverse_covariance, centered_points)
+        cutoff = quantile(squared_distances_train, 0.95)
+        self.cutoff = cutoff
+    def is_inside_cluster(self, point,user_loc,id):
+         diff = point - self.centroid
+         isInside = float(diff @ self.inverse_covariance @ diff) <= self.cutoff
+         if isInside:
+             self.user_locs.append(user_loc)
+             self.user_ids.append(id)
+         return isInside
+    def add_child_node(self, node):
+        self.subgroups.append(node)
+
+def traverse_link_tree(Node,subgroup_ancestor,embedding_matrix):
+    if(Node.is_leaf()):
+        return
+    if Node.valid_subgroup:
+       this_node = Subgroup_Node(subgroup_ancestor,Node.children,embedding_matrix)
+       if subgroup_ancestor:
+           subgroup_ancestor.add_child_node(this_node)
+       traverse_link_tree(Node.left,this_node,embedding_matrix)
+       traverse_link_tree(Node.right,this_node,embedding_matrix)
+    else:
+        traverse_link_tree(Node.left,subgroup_ancestor,embedding_matrix)
+        traverse_link_tree(Node.right,subgroup_ancestor,embedding_matrix)
+
+def visualize_subgroups_with_umap(data, subgroup_tree):
+    embedding_matrix = data["embedding_matrix"]
+    ids = np.array(data["embedding_ids"])
+    is_user = np.char.startswith(ids, "t2_")
+
+    umap_2d = compute_umap_2d(embedding_matrix, n_neighbors=30, min_dist=0.05, metric="cosine", random_state=42)
+    plot_umap_with_subgroups(umap_2d, ids, is_user, subgroup_tree)
+
 def compute_umap_2d(embedding_matrix, n_neighbors=30, min_dist=0.05, metric="cosine", random_state=42):
     reducer = umap.UMAP(
         n_components=2,
@@ -211,22 +294,6 @@ def compute_umap_2d(embedding_matrix, n_neighbors=30, min_dist=0.05, metric="cos
     )
     umap_2d = reducer.fit_transform(embedding_matrix)  # shape (N, 2)
     return umap_2d
-
-def walk_subgroups(root):
-    """Yield (node, children_ids) for every subgroup node (including root)."""
-    stack = [root]
-    while stack:
-        node = stack.pop()
-        yield node, node.children_ids
-        stack.extend(node.subgroups)
-
-def enumerate_subgroups(root):
-    labels = {}
-    i = 0
-    for node, children in walk_subgroups(root):
-        labels[node] = f"C{i}"
-        i += 1
-    return labels
 
 def plot_umap_with_subgroups(
     umap_2d, ids, is_user_mask, subgroup_tree, point_size=6, alpha_points=0.25, alpha_hull=0.15
@@ -271,41 +338,21 @@ def plot_umap_with_subgroups(
     plt.tight_layout()
     plt.show()
 
-def visualize_subgroups_with_umap(data, subgroup_tree):
-    embedding_matrix = data["embedding_matrix"]
-    ids = np.array(data["embedding_ids"])
-    is_user = np.char.startswith(ids, "t2_")
+def walk_subgroups(root):
+    """Yield (node, children_ids) for every subgroup node (including root)."""
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        yield node, node.children_ids
+        stack.extend(node.subgroups)
 
-    umap_2d = compute_umap_2d(embedding_matrix, n_neighbors=30, min_dist=0.05, metric="cosine", random_state=42)
-    plot_umap_with_subgroups(umap_2d, ids, is_user, subgroup_tree)
-
-class Subgroup_Node:
-    def __init__(self, parent, children_ids,embedding_matrix):
-        self.parent = parent
-        self.subgroups = []
-        self.user_locs = []
-        self.user_ids=[]
-        self.children_ids = children_ids
-        cluster_points = embedding_matrix[children_ids]
-        centroid = cluster_points.mean(axis=0)
-        self.centroid = centroid
-        centered_points = cluster_points - centroid
-        ledoit = LedoitWolf().fit(centered_points)
-        covariance_matrix = ledoit.covariance_
-        inverse_covariance = pinv(covariance_matrix)
-        self.inverse_covariance = inverse_covariance
-        squared_distances_train = np.einsum('ij,jk,ik->i', centered_points, inverse_covariance, centered_points)
-        cutoff = quantile(squared_distances_train, 0.95)
-        self.cutoff = cutoff
-    def is_inside_cluster(self, point,user_loc,id):
-         diff = point - self.centroid
-         isInside = float(diff @ self.inverse_covariance @ diff) <= self.cutoff
-         if isInside:
-             self.user_locs.append(user_loc)
-             self.user_ids.append(id)
-         return isInside
-    def add_child_node(self, node):
-        self.subgroups.append(node)
+def enumerate_subgroups(root):
+    labels = {}
+    i = 0
+    for node, children in walk_subgroups(root):
+        labels[node] = f"C{i}"
+        i += 1
+    return labels
 
 def sort_user_into_hierarchy(user_embedding,user_loc,node,id):
     if len(node.subgroups) >0:
@@ -313,59 +360,11 @@ def sort_user_into_hierarchy(user_embedding,user_loc,node,id):
           if subgroup.is_inside_cluster(user_embedding,user_loc,id):
               sort_user_into_hierarchy(user_embedding,user_loc,subgroup,id)
 
-def subgroup_hierarchy_tree(link_tree, embedding_matrix):
-
-    root = Subgroup_Node(None,link_tree.children,embedding_matrix)
-    traverse_link_tree(link_tree.left,root,embedding_matrix)
-    traverse_link_tree(link_tree.right,root,embedding_matrix)
-    return root
-
-def traverse_link_tree(Node,subgroup_ancestor,embedding_matrix):
-    if(Node.is_leaf()):
-        return
-    if Node.valid_subgroup:
-       this_node = Subgroup_Node(subgroup_ancestor,Node.children,embedding_matrix)
-       if subgroup_ancestor:
-           subgroup_ancestor.add_child_node(this_node)
-       traverse_link_tree(Node.left,this_node,embedding_matrix)
-       traverse_link_tree(Node.right,this_node,embedding_matrix)
-    else:
-        traverse_link_tree(Node.left,subgroup_ancestor,embedding_matrix)
-        traverse_link_tree(Node.right,subgroup_ancestor,embedding_matrix)
-
-def clustering_labeling(data):
-      embedding_matrix = data['embedding_matrix']
-      ids = data['embedding_ids']
-      is_comment = np.char.startswith(ids, 't1_')
-      is_post    = np.char.startswith(ids, 't3_')
-      is_user = np.char.startswith(ids, 't2_')
-      is_text    = is_comment | is_post
-
-      pca = PCA(n_components=0.8, svd_solver='full')
-      pca_reduced_embeddings = pca.fit_transform(embedding_matrix)
-
-      text_idx = np.where(is_text)[0]
-
-      linkage_matrix = linkage(pca_reduced_embeddings[text_idx], method="ward")
-      link_tree = to_tree(linkage_matrix)
-
-      recursive_children_decorator(link_tree, text_idx)
-      compare_subgroups(link_tree, pca_reduced_embeddings)
-      subgroup_tree = subgroup_hierarchy_tree(link_tree, pca_reduced_embeddings)
-      visualize_subgroups_with_umap(data, subgroup_tree)
-      user_idx = np.where(is_user)[0]
-
-      for i in user_idx:
-        id = ids[i]
-        subgroup_tree.user_ids.append(id)
-        subgroup_tree.user_locs.append(i)
-        user_embedding = pca_reduced_embeddings[i]
-        sort_user_into_hierarchy(user_embedding, i, subgroup_tree,id)
-      make_subgroup_df(subgroup_tree,data)
-      find_word_count_differences(data)
-      find_exemplar_texts(data,pca_reduced_embeddings)
-      generate_labels(data)
-      return
+def init_valid_flags(node):
+  node.valid_subgroup = False
+  if not node.is_leaf():
+    init_valid_flags(node.left)
+    init_valid_flags(node.right)
 
 def make_subgroup_df(subgroup_tree, data):
     users_df = data['users']
@@ -410,62 +409,6 @@ def make_subgroup_df(subgroup_tree, data):
     subgroups_df = pd.DataFrame.from_records(subgroup_objects)
     data['subgroups'] = subgroups_df
     print(subgroups_df.head())
-
-def generate_labels(data):
-    subgroups_df = data['subgroups']
-    texts = data['texts']
-    subgroup_labels = []
-    for subgroup in subgroups_df.itertuples(index=False):
-        log_odds = np.array(subgroup.wlogodds_z)
-        order = np.argsort(log_odds)
-        top10 = order[-10:][::-1]
-        bottom10 = order[:10]
-        vocab = data["words"].index.tolist()
-        top_words = [vocab[i] for i in top10]
-        bottom_words = [vocab[i] for i in bottom10]
-        ((cent_label, cent_id),
-        (up_label, up_id),
-        (rep_label, rep_id)) = subgroup.subgroup_exemplars
-        prompt = f"""
-You are an expert at naming Reddit subgroups. Based on example texts from the subgroup, and a list of words that are used more or less commonly in that group compared to the whole population, Return a short descriptive name (<=4 words). Only the name.
-1) This text was very typical for the subgroup: '{texts[cent_id]}'
-2) This text had a lot of upvotes '{texts[up_id]}'
-3) this text had many responses: '{texts[rep_id]}'
-
-The group used these words more than others in the subreddit: {", ".join(top_words)
-                                            }
-The group used these words less than other in the subreddit: {", ".join(bottom_words)}
-What should we call this group? Respond with only 1-4 words.
-"""
-        messages = [
-            {"role": "user", "content": prompt},
-        ]
-        enc = tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            return_tensors="pt",
-            return_dict=True,
-        )
-        enc = {k: v.to(model.device) for k, v in enc.items()}
-
-        outputs = model.generate(
-            **enc,
-            max_new_tokens=12,
-            do_sample=False,
-        )
-        input_len = enc["input_ids"].shape[1]
-        gen_tokens = outputs[0, input_len:]
-        raw = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
-        label = raw.splitlines()[0].strip()
-        print("Subgroup label generated:", label)
-
-    # take last line as the "answer"
-
-    #We'll use these to produce a structured query for a local llm.
-    #The query will include
-    # The name of the reddit, the name of the supergroup (if any), what words are commonly used or not used in the reddit, and the texts of our 3-5 exemplars
-    # We'll request a label which is 1-3 words long and is descriptive.
-    return
 
 def find_exemplar_texts(data,embedding_matrix):
     subgroups_df = data['subgroups']
@@ -613,12 +556,73 @@ def weighted_log_odds_z(y1, y_global, alpha=10.0):
     z = delta / np.sqrt(var)
     return z.astype(np.float32)
 
+def generate_labels(data):
+    subgroups_df = data['subgroups']
+    texts = data['texts']
+    subgroup_labels = []
+    for subgroup in subgroups_df.itertuples(index=False):
+        log_odds = np.array(subgroup.wlogodds_z)
+        order = np.argsort(log_odds)
+        top10 = order[-10:][::-1]
+        bottom10 = order[:10]
+        vocab = data["words"].index.tolist()
+        top_words = [vocab[i] for i in top10]
+        bottom_words = [vocab[i] for i in bottom10]
+        ((cent_label, cent_id),
+        (up_label, up_id),
+        (rep_label, rep_id)) = subgroup.subgroup_exemplars
+        prompt = f"""
+You are an expert at naming Reddit subgroups. Based on example texts from the subgroup, and a list of words that are used more or less commonly in that group compared to the whole population, Return a short descriptive name (<=4 words). Only the name.
+1) This text was very typical for the subgroup: '{texts[cent_id]}'
+2) This text had a lot of upvotes '{texts[up_id]}'
+3) this text had many responses: '{texts[rep_id]}'
+
+The group used these words more than others in the subreddit: {", ".join(top_words)
+                                            }
+The group used these words less than other in the subreddit: {", ".join(bottom_words)}
+What should we call this group? Respond with only 1-4 words.
+"""
+        messages = [
+            {"role": "user", "content": prompt},
+        ]
+        enc = tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True,
+        )
+        enc = {k: v.to(model.device) for k, v in enc.items()}
+
+        outputs = model.generate(
+            **enc,
+            max_new_tokens=12,
+            do_sample=False,
+        )
+        input_len = enc["input_ids"].shape[1]
+        gen_tokens = outputs[0, input_len:]
+        raw = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
+        label = raw.splitlines()[0].strip()
+        subgroup_labels.append(label)
+        # Check if label fits our format.
+        # If it doesn't, regenerate, potentially with alternative query
+
+    subgroups_df['label'] = subgroup_labels
+    return
+
+def run_pipeline(path="./data.json"):
+    data = load_enriched_embeddings()
+    identify_bots(data)
+    calculate_word_vectors(data)
+    (subgroup_tree, pca_reduced_embeddings) = clustering(data)
+    make_subgroup_df(subgroup_tree,data)
+    find_word_count_differences(data)
+    find_exemplar_texts(data,pca_reduced_embeddings)
+    generate_labels(data)
+
+if __name__ == "__main__":
+    run_pipeline("./data.json")
 
 
 
 
 
-
-data = load_enriched_embeddings()
-calculate_word_vectors(data)
-clustering_labeling(data)
