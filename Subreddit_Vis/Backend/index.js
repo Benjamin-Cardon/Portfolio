@@ -612,6 +612,7 @@ function reduce_post(post_metrics, enriched_embeddings) {
       positive_comments: 0,
       negative_comments: 0,
       neutral_comments: 0
+      is_likely_bot: post_metrics.flags.is_likely_bot,
     };
     users[author_id] = user;
   } else {
@@ -715,7 +716,8 @@ function reduce_comments(comments_metrics, enriched_embeddings, postMap, comment
         neutral_replies: 0,
         positive_comments: 0,
         negative_comments: 0,
-        neutral_comments: 0
+        neutral_comments: 0,
+        is_likely_bot: comment_metrics.flags.is_likely_bot
       };
       users[comment.author_id] = user;
     } else {

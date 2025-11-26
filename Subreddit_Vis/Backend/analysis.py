@@ -48,6 +48,31 @@ def load_enriched_embeddings(path="./data.json"):
     "texts": texts
 }
 
+def identify_bots(data):
+    user_df = data['users']
+    embedding_ids = data['embedding_ids']
+    embeddings = data['embedding_matrix']
+    possible_bots = user_df[user_df["is_likely_bot"]]
+    confirmed_bots = []
+    for row in possible_bots.itertuples(index=False):
+        text_ids = row.text_ids
+        if len(text_ids) < 3:
+            continue
+        text_locs = [embedding_ids.index(id) for id in text_ids]
+        bot_embeds = embeddings[text_locs]
+        norms = np.linalg.norm(bot_embeds, axis=1, keepdims=True) + 1e-8
+        bot_norm = bot_embeds / norms
+        bot_text_similarity = bot_norm @ bot_norm.T
+        dup_counts = (bot_text_similarity >= 0.9).sum(axis=1) - 1
+
+        # if any text has enough near-duplicates, flag this user as a bot
+        if (dup_counts >= (2)).any():
+            # choose whatever identifier you use for users:
+            # e.g. row.user_id, row.username, row.id, etc.
+            confirmed_bots.append(row.user_id)
+    data['users'].loc[data['users']['user_id'].isin(confirmed_bots), 'is_bot'] = True
+
+
 def user_words_to_vector(word_data, word_to_index, vocab_size):
   vec = np.zeros(vocab_size, dtype=np.float32)
   if not isinstance(word_data, dict):
