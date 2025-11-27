@@ -129,7 +129,7 @@ async function get_and_save_auth_token(tokenholder) {
 async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
   try {
     const { requests_remaining, ms_remaining } = get_request_rates()
-    if (!requests_remaining) {
+    if (requests_remaining === 0) {
       console.log("Tried to run function with no requests. Wait " + ms_remaining / 60000 + " minutes before trying again");
       process.exit(1);
     }
@@ -173,7 +173,6 @@ async function main(config) {
   await get_comment_trees(config, data, postMap, commentMap);
   const enriched_embeddings = await calculate_metrics(data, postMap, commentMap);
   stack_average_user_embeddings(enriched_embeddings)
-  console.log(enriched_embeddings.users)
   write_to_json(enriched_embeddings);
   call_python_scripts();
   // compute_user_similarity_matrix(metrics.user_summaries)
@@ -191,8 +190,8 @@ function check_request_count(proposed_requests) {
 function get_request_rates() {
   let request_summary = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
     const [count, time] = current.split(':')
-    accumulator.requests_used += count
-    accumulator.window_ends_at = Math.min(Number(time), accumulator.earliest_request);
+    accumulator.requests_used += Number(count)
+    accumulator.earliest_request = Math.min(Number(time), accumulator.earliest_request);
     return accumulator;
   }, { requests_used: 0, earliest_request: Date.now() });
 
@@ -200,7 +199,7 @@ function get_request_rates() {
     requests_used: request_summary.requests_used,
     requests_remaining: 1000 - request_summary.requests_used,
     window_ends_at: request_summary.earliest_request + 600000,
-    ms_remaining: request_summary.window_ends_at - Date.now()
+    ms_remaining: request_summary.earliest_request + 600000 - Date.now()
   }
 };
 
@@ -224,15 +223,15 @@ async function get_posts_until(data, config,) {
   while (data.length < config.postLimit) {
     const { requests_remaining, ms_remaining } = get_request_rates();
 
-    if (requests_remaining) {
+    if (requests_remaining === 0) {
       console.log("There are currently no requests available.")
       if ((config.mode === 'count' && config.burst_mode === 'sleep') || config.mode === 'full') {
         console.log(`Waiting ${ms_remaining / 60000} minutes until beginning requests`);
         await sleep(ms_remaining);
+      } else {
+        console.log(`Exiting early becuase of request counting error. After ${ms_remaining / 60000} minutes more requests will be available. `)
+        process.exit(1);
       }
-    } else {
-      console.log(`Exiting early becuase of request counting error. After ${ms_remaining / 60000} minutes more requests will be available. `)
-      process.exit(1);
     }
     try {
       if (after) params.after = after;
@@ -611,7 +610,7 @@ function reduce_post(post_metrics, enriched_embeddings) {
       negative_replies: 0,
       positive_comments: 0,
       negative_comments: 0,
-      neutral_comments: 0
+      neutral_comments: 0,
       is_likely_bot: post_metrics.flags.is_likely_bot,
     };
     users[author_id] = user;
@@ -717,7 +716,7 @@ function reduce_comments(comments_metrics, enriched_embeddings, postMap, comment
         positive_comments: 0,
         negative_comments: 0,
         neutral_comments: 0,
-        is_likely_bot: comment_metrics.flags.is_likely_bot
+        is_likely_bot: comment.flags.is_likely_bot
       };
       users[comment.author_id] = user;
     } else {
@@ -943,7 +942,6 @@ function stack_average_user_embeddings(enriched_embeddings) {
     } else {
       user.only_one_text = false;
     }
-    console.log(text_embeddings)
     const stacked = stack(text_embeddings, 0);
     const mean_embedding = mean(stacked, 0).squeeze();
     const embedding_norm = mean_embedding.norm();
