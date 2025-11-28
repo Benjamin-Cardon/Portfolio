@@ -365,9 +365,9 @@ async function get_comment_trees(config, data, postMap, commentMap) {
     const req = more_nodes_request_queue.shift();
     const { parentNode, childrenIds } = req;
     // console.log(req)
-    const url = `https://oauth.reddit.com/api/morechildren.json?link_id=${req.postId}&children=${childrenIds.join(",")}`;
+    const url = `https://oauth.reddit.com/api/morechildren?api_type=json&raw_json=1&link_id=${req.postId}&children=${childrenIds.join(",")}`;
     try {
-      const res = await axios.get(url, { headers });
+      const res = await axios.get(url, { headers: config.headers });
       const newChildren = res.data.json.data.things; // array of 't1' comments
       logStage('MORE_CHILDREN', `Queued ${newChildren.length} extra nodes`);
       for (const child of newChildren) {
@@ -388,12 +388,22 @@ async function get_comment_trees(config, data, postMap, commentMap) {
           return;
         }
         if (child.data.parent_id.slice(0, 2) == 't3') {
-          postMap.get(child.data.parent_id).data.comments.push(child);
+          postMap.get(child.data.parent_id).comments.push(child);
         } else if (child.data.parent_id.slice(0, 2) == 't1') {
-          if (commentMap.get(child.data.parent_id).data.replies == "") {
-            commentMap.get(child.data.parent_id).data.replies = [child];
+          const parentComment = commentMap.get(child.data.parent_id);
+          if (parentComment.data.replies === "") {
+            parentComment.data.replies = {
+              kind: "Listing",
+              data: { children: [child] },
+            };
+          } else if (parentComment.data.replies?.data?.children) {
+            parentComment.data.replies.data.children.push(child);
           } else {
-            commentMap.get(child.data.parent_id).data.replies.push(child)
+            // Fallback: if replies got into some weird shape, normalize
+            parentComment.data.replies = {
+              kind: "Listing",
+              data: { children: [child] },
+            };
           }
         }
       })
