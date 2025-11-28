@@ -482,7 +482,7 @@ async function calculate_metrics(data, postMap, commentMap) {
 }
 
 function classify_post(post) {
-  const selftext = (post.data.selftext || "").trim();
+  const selftext = (post.data.title || "").trim() + (post.data.selftext || "").trim();
   const author = post.data.author
   const isEmptyText = selftext.length === 0;
   const isDeletedText = selftext === "[deleted]";
@@ -536,17 +536,27 @@ async function calculate_comments_metrics(comments, post_fullname, enriched_embe
   return comments_metrics;
 }
 function classify_comment(comment) {
-  const text = (comment.data.body || "").trim();
-  const author = comment.data.author;
-  const isEmptyText = text.length === 0;
-  const isDeletedText = text === "[deleted]";
-  const isRemovedText = text === "[removed]";
+  const rawTitle = (post.data.title || "").trim();
+  const rawSelftext = (post.data.selftext || "").trim();
+  const author = (post.data.author || "").trim();
+
+  const isTitleDeleted = rawTitle === "[deleted]";
+  const isTitleRemoved = rawTitle === "[removed]";
+  const isBodyDeleted = rawSelftext === "[deleted]";
+  const isBodyRemoved = rawSelftext === "[removed]";
+
+  const hasTitleText = rawTitle.length > 0 && !isTitleDeleted && !isTitleRemoved;
+  const hasBodyText = rawSelftext.length > 0 && !isBodyDeleted && !isBodyRemoved;
+
+  // This is the key: any real text at all → valid
+  const hasAnyText = hasTitleText || hasBodyText;
+  const isNotValidText = !hasAnyText;
   const isDeletedAuthor = author === "[deleted]";
   const isAutoModAuthor = author === "AutoModerator";
   const isLikelyBot = isAutoModAuthor || /bot$/i.test(author || "");
   const isNotValidText = isEmptyText || isDeletedText || isRemovedText;
   const isRepliedTo = comment.data?.replies?.data?.children?.length ?? 0 > 0;
-  return { isEmptyText, isDeletedText, isRemovedText, isDeletedAuthor, isAutoModAuthor, isLikelyBot, isNotValidText, isRepliedTo }
+  return { isDeletedAuthor, isAutoModAuthor, isLikelyBot, isNotValidText, isRepliedTo }
 }
 async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings) {
   logStage('COMMENT_FLATTEN', `Flattening comment ${comment.data.id}, parent ${comment.data.parent_id}`);
@@ -621,7 +631,7 @@ function reduce_post(post_metrics, enriched_embeddings) {
       positive_comments: 0,
       negative_comments: 0,
       neutral_comments: 0,
-      is_likely_bot: post_metrics.flags.is_likely_bot,
+      is_likely_bot: post_metrics.flags.isLikelyBot,
     };
     users[author_id] = user;
   } else {
@@ -726,7 +736,7 @@ function reduce_comments(comments_metrics, enriched_embeddings, postMap, comment
         positive_comments: 0,
         negative_comments: 0,
         neutral_comments: 0,
-        is_likely_bot: comment.flags.is_likely_bot
+        is_likely_bot: comment.flags.isLikelyBot
       };
       users[comment.author_id] = user;
     } else {

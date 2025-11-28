@@ -69,9 +69,9 @@ def identify_bots(data):
         if (dup_counts >= (2)).any():
             # choose whatever identifier you use for users:
             # e.g. row.user_id, row.username, row.id, etc.
-            confirmed_bots.append(row.user_id)
+            confirmed_bots.append(row.author_id)
     data['users']['is_bot'] = False
-    data['users'].loc[data['users']['user_id'].isin(confirmed_bots), 'is_bot'] = True
+    data['users'].loc[data['users']['author_id'].isin(confirmed_bots), 'is_bot'] = True
 
 def calculate_word_vectors(data):
   users = data['users']
@@ -82,6 +82,8 @@ def calculate_word_vectors(data):
   vocab_size = len(vocab_index)
   word_to_index = {word: idx for idx, word in enumerate(vocab_index)}
   print(len(word_to_index))
+  print("Posts columns:", posts.columns.tolist())
+  print("Comments columns:", comments.columns.tolist())
   users['word_count_vector'] = users['words'].apply(lambda wd: user_words_to_vector(wd, word_to_index, vocab_size))
   comments['word_count_vector'] = comments['frequency_table'].apply(lambda wd: frequency_table_to_vector(wd,word_to_index, vocab_size))
   posts['word_count_vector'] = posts['frequency_table'].apply(lambda wd:frequency_table_to_vector(wd,word_to_index,vocab_size))
@@ -603,6 +605,7 @@ What should we call this group? Respond with only 1-4 words.
         raw = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
         label = raw.splitlines()[0].strip()
         subgroup_labels.append(label)
+        print("Label Generated: "+ label)
         # Check if label fits our format.
         # If it doesn't, regenerate, potentially with alternative query
 
