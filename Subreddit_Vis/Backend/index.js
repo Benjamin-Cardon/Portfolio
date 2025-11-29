@@ -172,6 +172,7 @@ async function main(config) {
   let commentMap = new Map();
   await get_comment_trees(config, data, postMap, commentMap);
   const enriched_embeddings = await calculate_metrics(data, postMap, commentMap);
+  enriched_embeddings['subreddit_name'] = config.subreddit
   stack_average_user_embeddings(enriched_embeddings)
   write_to_json(enriched_embeddings);
   call_python_scripts();
@@ -482,17 +483,26 @@ async function calculate_metrics(data, postMap, commentMap) {
 }
 
 function classify_post(post) {
-  const selftext = (post.data.title || "").trim() + (post.data.selftext || "").trim();
-  const author = post.data.author
-  const isEmptyText = selftext.length === 0;
-  const isDeletedText = selftext === "[deleted]";
-  const isRemovedText = selftext === "[removed]";
-  const isNotValidText = isEmptyText || isDeletedText || isRemovedText
-  const isDeletedAuthor = author == "[deleted]"
-  const isAutoModAuthor = author == "AutoModerator"
+  const rawTitle = (post.data.title || "").trim();
+  const rawSelftext = (post.data.selftext || "").trim();
+  const author = (post.data.author || "").trim();
+
+  const isTitleDeleted = rawTitle === "[deleted]";
+  const isTitleRemoved = rawTitle === "[removed]";
+  const isBodyDeleted = rawSelftext === "[deleted]";
+  const isBodyRemoved = rawSelftext === "[removed]";
+
+  const hasTitleText = rawTitle.length > 0 && !isTitleDeleted && !isTitleRemoved;
+  const hasBodyText = rawSelftext.length > 0 && !isBodyDeleted && !isBodyRemoved;
+
+  // This is the key: any real text at all → valid
+  const hasAnyText = hasTitleText || hasBodyText;
+  const isNotValidText = !hasAnyText;
+  const isDeletedAuthor = author === "[deleted]";
+  const isAutoModAuthor = author === "AutoModerator";
   const isLikelyBot = isAutoModAuthor || /bot$/i.test(author || "");
   const isRepliedTo = post.data.num_comments > 0;
-  return { isEmptyText, isDeletedText, isRemovedText, isDeletedAuthor, isAutoModAuthor, isLikelyBot, isRepliedTo, isNotValidText }
+  return { isDeletedAuthor, isAutoModAuthor, isLikelyBot, isNotValidText, isRepliedTo }
 }
 async function calculate_post_metrics(post, enriched_embeddings) {
   const post_metrics = {};
@@ -523,7 +533,6 @@ async function calculate_post_metrics(post, enriched_embeddings) {
     enriched_embeddings.texts[post.data.name] = text
   }
 
-
   return post_metrics;
 }
 
@@ -536,27 +545,17 @@ async function calculate_comments_metrics(comments, post_fullname, enriched_embe
   return comments_metrics;
 }
 function classify_comment(comment) {
-  const rawTitle = (post.data.title || "").trim();
-  const rawSelftext = (post.data.selftext || "").trim();
-  const author = (post.data.author || "").trim();
-
-  const isTitleDeleted = rawTitle === "[deleted]";
-  const isTitleRemoved = rawTitle === "[removed]";
-  const isBodyDeleted = rawSelftext === "[deleted]";
-  const isBodyRemoved = rawSelftext === "[removed]";
-
-  const hasTitleText = rawTitle.length > 0 && !isTitleDeleted && !isTitleRemoved;
-  const hasBodyText = rawSelftext.length > 0 && !isBodyDeleted && !isBodyRemoved;
-
-  // This is the key: any real text at all → valid
-  const hasAnyText = hasTitleText || hasBodyText;
-  const isNotValidText = !hasAnyText;
-  const isDeletedAuthor = author === "[deleted]";
-  const isAutoModAuthor = author === "AutoModerator";
+  const body = (comment.data.body || "").trim();
+  const author = comment.data.author
+  const isEmptyText = body.length === 0;
+  const isDeletedText = body === "[deleted]";
+  const isRemovedText = body === "[removed]";
+  const isNotValidText = isEmptyText || isDeletedText || isRemovedText
+  const isDeletedAuthor = author == "[deleted]"
+  const isAutoModAuthor = author == "AutoModerator"
   const isLikelyBot = isAutoModAuthor || /bot$/i.test(author || "");
-  const isNotValidText = isEmptyText || isDeletedText || isRemovedText;
   const isRepliedTo = comment.data?.replies?.data?.children?.length ?? 0 > 0;
-  return { isDeletedAuthor, isAutoModAuthor, isLikelyBot, isNotValidText, isRepliedTo }
+  return { isEmptyText, isDeletedText, isRemovedText, isDeletedAuthor, isAutoModAuthor, isLikelyBot, isRepliedTo, isNotValidText }
 }
 async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings) {
   logStage('COMMENT_FLATTEN', `Flattening comment ${comment.data.id}, parent ${comment.data.parent_id}`);

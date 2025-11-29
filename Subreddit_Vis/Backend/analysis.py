@@ -45,7 +45,8 @@ def load_enriched_embeddings(path="./data.json"):
     "users": users_df,
     "embedding_ids": embedding_ids,
     "embedding_matrix": embedding_matrix,
-    "texts": texts
+    "texts": texts,
+    "subreddit_name":data["subreddit_name"]
 }
 
 def identify_bots(data):
@@ -560,6 +561,7 @@ def weighted_log_odds_z(y1, y_global, alpha=10.0):
 
 def generate_labels(data):
     subgroups_df = data['subgroups']
+    subgroup = data[]
     texts = data['texts']
     subgroup_labels = []
     for subgroup in subgroups_df.itertuples(index=False):
