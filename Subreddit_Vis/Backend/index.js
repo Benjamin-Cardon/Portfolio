@@ -31,41 +31,68 @@ const nlp = winkNLP(model, ['sbd', 'negation', 'sentiment', 'ner', 'pos']);
 const its = nlp.its;
 const as = nlp.as;
 
-const mode = process.argv[2]
-if (!(mode == 'count' || mode == 'full')) {
-  console.error('please specify mode of either "count" or "full" ');
-  process.exit(1);
-}
-const subreddit = process.argv[3] || 'dataengineering';
-const count = Number(process.argv[4]) || 10;
-if (mode === 'count' && (isNaN(count) || count <= 0)) {
-  console.error('In count mode, please specify a positive numeric count.');
-  process.exit(1);
-}
-const isCount = mode == 'count'
-const isFull = mode == 'full';
-let burst_mode = '';
-if (isCount) {
-  burst_mode = process.argv[4] || 'end';
-  if (burst_mode !== 'end' && burst_mode !== 'sleep') {
-    console.log("incorrect or no burst mode included. Defaulting to 'end' mode. In end mode, the process will end after it hits it's reddit API request limit, even if more posts or comments are available to request");
-    burst_mode = 'sleep';
+
+processCLI(process.slice(2))
+
+function processCLI(args) {
+  // Step one: see if we are in a file / file output function
+  const configfilePath = args.find((arg) => arg.startsWith('--file=')).split('=')[1]
+  const isFileMode = configfilePath !== undefined
+  if (isFileMode) {
+    const out_dir = args.find((arg) => arg.startsWith('--out_dir=')).split('=')[1] || "./data_outputs"
+    const config_file_text = fs.readFileSync('/Users/joe/test.txt', 'utf8')
+    // Need to add Try-Catch Here.
+    const commands = config_file_text.split(',').map((command) => command.split(' '))
+    for (const command of commands) {
+      let config = produce_config(command.slice(2), isFileMode, out_dir)
+      main(config)
+    }
+  } else {
+    let config = produce_config(args, isFileMode, null)
+    main(config)
   }
 }
-const init = await initialize(subreddit);
 
-const config = {
-  mode, isCount, isFull, postLimit: isCount ? count : Infinity, burst_mode, subreddit, ...init
+function produce_config(args, isFileMode, batchOutDir) {
+  const mode = args.find((arg) => (arg.startsWith("--mode="))).split("=")[1]
+  // Should we consider it to be running on "Full" if we're runnning in file mode without an argument?
+  if (!(mode == 'count' || mode == 'full')) {
+    console.error('please specify mode of either "count" or "full" ');
+    process.exit(1);
+  }
+  const subreddit = args.find((arg) => arg.startsWith('--subreddit=')).split("=")[1]
+  // subreddit is absolutely a required flag.
+  const count = Number(args.find((arg) => arg.startsWith('--count=')).split("=")[1])
+  // Count is only needed if we're running in count mode.
+  const out_dir = args.find((arg) => arg.startsWith('--out_dir=')).split('=')[1] || "./"
+  const out = args.find((arg) => arg.startsWith('--out=')).split('=')[1] || `${subreddit}_data`
+  // if we're doing a batch, we'll want to handle output differently.
+  if (mode === 'count' && (isNaN(count) || count <= 0)) {
+    console.error('In count mode, please specify a positive numeric count.');
+    process.exit(1);
+  }
+
+  const burst_mode = args.find((arg) => arg.startsWith('--burst_mode=')).split("=")[1]
+  // If we have filemode, does it make sense to ever do burst mode?
+  const isCount = mode == 'count'
+  const isFull = mode == 'full';
+
+  if (isCount) {
+    let burst_mode = process.argv[4] || 'end';
+    if (burst_mode !== 'end' && burst_mode !== 'sleep') {
+      console.log("incorrect or no burst mode included. Defaulting to 'end' mode. In end mode, the process will end after it hits it's reddit API request limit, even if more posts or comments are available to request");
+      burst_mode = 'sleep';
+    } // Does this make sense as an argument? At this point wouldn't we really just prefer sleep?
+  }
+  const init = await initialize(subreddit);
+
+  const config = {
+    mode, isFileMode, isCount, isFull, postLimit: isCount ? count : Infinity, burst_mode, subreddit, out_dir, out, ...init
+  }
+  logStage('INIT', `Mode: ${config.mode}, Subreddit: ${config.subreddit}, Post limit: ${config.postLimit}`);
+
+  return config
 }
-
-logStage('INIT', `Mode: ${config.mode}, Subreddit: ${config.subreddit}, Post limit: ${config.postLimit}`);
-
-if (isCount && isNaN(count)) {
-  console.error('In count mode, please specify a numeric count.');
-  process.exit(1);
-}
-
-main(config);
 
 async function initialize(subreddit) {
   const tokenholder = { token: "" };
@@ -84,6 +111,7 @@ async function initialize(subreddit) {
   }
   return { headers, tokenholder, isSfwPublic };
 }
+
 
 async function check_auth_token_expired(tokenholder) {
   try {
