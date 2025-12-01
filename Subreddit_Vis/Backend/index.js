@@ -32,53 +32,75 @@ const its = nlp.its;
 const as = nlp.as;
 
 
-processCLI(process.slice(2))
+processCLI(process.argv.slice(2))
 
-function processCLI(args) {
+function getFlag(args, flag, defaultVal) {
+  let rawFlag = args.find((arg) => arg.startsWith(flag))
+  let flagVal, isBool
+  if (!rawFlag) {
+    isBool = false
+    flagVal = defaultVal
+  } else {
+    isBool = true
+    flagVal = rawFlag.split('=')[1]
+  }
+  return [flagVal, isBool]
+}
+
+async function processCLI(args) {
   // Step one: see if we are in a file / file output function
-  const configfilePath = args.find((arg) => arg.startsWith('--file=')).split('=')[1]
-  const isFileMode = configfilePath !== undefined
+  const [configFilePath, isFileMode] = getFlag(args, '--file=', null)
+
   if (isFileMode) {
-    const out_dir = args.find((arg) => arg.startsWith('--out_dir=')).split('=')[1] || "./data_outputs"
-    const config_file_text = fs.readFileSync('/Users/joe/test.txt', 'utf8')
+    console.log("Entered Filemode")
+    const [out_dir, hasOutDir] = getFlag(args, '--out_dir', './data_outputs')
+    const config_file_text = readFileSync(configFilePath, 'utf8')
+    console.log(config_file_text)
     // Need to add Try-Catch Here.
     const commands = config_file_text.split(',').map((command) => command.split(' '))
     for (const command of commands) {
-      let config = produce_config(command.slice(2), isFileMode, out_dir)
+      let config = await produce_config(command, isFileMode, out_dir)
       main(config)
     }
   } else {
-    let config = produce_config(args, isFileMode, null)
+    console.log("Entered single mode")
+    let config = await produce_config(args, isFileMode, null)
     main(config)
   }
 }
 
-function produce_config(args, isFileMode, batchOutDir) {
-  const mode = args.find((arg) => (arg.startsWith("--mode="))).split("=")[1]
+async function produce_config(args, isFileMode, batchOutDir) {
+  const [mode, hasModeArg] = getFlag(args, '--mode=', null)
+  console.log(mode)
   // Should we consider it to be running on "Full" if we're runnning in file mode without an argument?
-  if (!(mode == 'count' || mode == 'full')) {
+  if (!(mode == 'count' || mode == 'full') || !hasModeArg) {
     console.error('please specify mode of either "count" or "full" ');
     process.exit(1);
   }
-  const subreddit = args.find((arg) => arg.startsWith('--subreddit=')).split("=")[1]
+  const [subreddit, hasSubredditArg] = getFlag(args, '--subreddit=', null)
   // subreddit is absolutely a required flag.
-  const count = Number(args.find((arg) => arg.startsWith('--count=')).split("=")[1])
+  const [count, hasCountArg] = getFlag(args, '--count=', null)
   // Count is only needed if we're running in count mode.
-  const out_dir = args.find((arg) => arg.startsWith('--out_dir=')).split('=')[1] || "./"
-  const out = args.find((arg) => arg.startsWith('--out=')).split('=')[1] || `${subreddit}_data`
+  let out_dir, hasOutDir;
+  if (!batchOutDir) {
+    [out_dir, hasOutDir] = getFlag(args, '--out_dir', './data_outputs')
+  } else {
+    out_dir = batchOutDir
+    hasOutDir = true
+  }
+
+  const [out, hasOutNameArg] = getFlag(args, '--out=', `${subreddit}_data`)
   // if we're doing a batch, we'll want to handle output differently.
   if (mode === 'count' && (isNaN(count) || count <= 0)) {
     console.error('In count mode, please specify a positive numeric count.');
     process.exit(1);
   }
-
-  const burst_mode = args.find((arg) => arg.startsWith('--burst_mode=')).split("=")[1]
+  const [burst_mode, hasBurstModeArg] = getFlag(args, '--burst_mode=', 'end')
   // If we have filemode, does it make sense to ever do burst mode?
   const isCount = mode == 'count'
   const isFull = mode == 'full';
 
   if (isCount) {
-    let burst_mode = process.argv[4] || 'end';
     if (burst_mode !== 'end' && burst_mode !== 'sleep') {
       console.log("incorrect or no burst mode included. Defaulting to 'end' mode. In end mode, the process will end after it hits it's reddit API request limit, even if more posts or comments are available to request");
       burst_mode = 'sleep';
@@ -292,8 +314,8 @@ async function get_posts_until(data, config,) {
       break;
     }
   }
-  if (data.length > count) {
-    data.length = count;
+  if (data.length > config.count) {
+    data.length = config.count;
   }
   if (config.isFull) {
     log_request_count(request_count % 50)
