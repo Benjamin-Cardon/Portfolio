@@ -1,6 +1,6 @@
 import axios from "axios";
 import path from "path";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { stack, mean, pipeline, env as transformersEnv } from "@xenova/transformers";
 import { multiply, transpose } from 'mathjs';
 import dotenv from "dotenv";
@@ -83,7 +83,7 @@ async function produce_config(args, isFileMode, batchOutDir) {
   // Count is only needed if we're running in count mode.
   let out_dir, hasOutDir;
   if (!batchOutDir) {
-    [out_dir, hasOutDir] = getFlag(args, '--out_dir', './data_outputs')
+    [out_dir, hasOutDir] = getFlag(args, '--out_dir=', './data_outputs')
   } else {
     out_dir = batchOutDir
     hasOutDir = true
@@ -133,7 +133,6 @@ async function initialize(subreddit) {
   }
   return { headers, tokenholder, isSfwPublic };
 }
-
 
 async function check_auth_token_expired(tokenholder) {
   try {
@@ -224,10 +223,8 @@ async function main(config) {
   const enriched_embeddings = await calculate_metrics(data, postMap, commentMap);
   enriched_embeddings['subreddit_name'] = config.subreddit
   stack_average_user_embeddings(enriched_embeddings)
-  write_to_json(enriched_embeddings);
+  write_to_json(enriched_embeddings, config);
   call_python_scripts();
-  // compute_user_similarity_matrix(metrics.user_summaries)
-  // console.log(Object.entries(metrics.user_summaries).filter(([key, value]) => { return value.reply_count == 0 }))
 }
 
 function sleep(ms) {
@@ -589,6 +586,7 @@ async function calculate_post_metrics(post, enriched_embeddings) {
 async function calculate_comments_metrics(comments, post_fullname, enriched_embeddings) {
   let comments_metrics = [];
   logStage('COMMENT_METRIC', `Input comments for flatten: ${comments?.length || 0}`);
+  console.log(comments)
   for (const comment of comments) {
     await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings)
   }
@@ -1022,13 +1020,15 @@ function stack_average_user_embeddings(enriched_embeddings) {
   }
 }
 
-function write_to_json(enriched_embeddings) {
+function write_to_json(enriched_embeddings, config) {
   const embeddings_serialized = {};
   for (const [key, emb] of Object.entries(enriched_embeddings.embeddings)) {
     embeddings_serialized[key] = Array.from(emb.data);
   }
   enriched_embeddings.embeddings = embeddings_serialized;
-  writeFileSync('data.json', JSON.stringify(enriched_embeddings));
+  mkdirSync(config.out_dir, { recursive: true });
+  const fullPath = path.join(config.out_dir, config.out);
+  writeFileSync(fullPath, JSON.stringify(enriched_embeddings));
 }
 
 function call_python_scripts() {

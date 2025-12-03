@@ -1,1 +1,1 @@
---mode=count --subreddit=dataengineering --count=20, --mode=count --subreddit=datascience --count=50
+--mode=count --subreddit=dataengineering --count=5, --mode=count --subreddit=datascience --count=5
