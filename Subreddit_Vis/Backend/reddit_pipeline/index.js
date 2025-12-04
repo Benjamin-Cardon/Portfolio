@@ -1,6 +1,8 @@
 import axios from "axios";
 import path from "path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { sentiment, embeddings, nlp, its, as } from "./init/init"
+import parse_and_validate_args from "./io/parseArgs"
 import { stack, mean } from "@xenova/transformers";
 import { multiply, transpose } from 'mathjs';
 import dotenv from "dotenv";
@@ -22,27 +24,10 @@ function getFlag(args, flag, defaultVal) {
   return [flagVal, isBool]
 }
 
-async function processCLI(args) {
-  // Step one: see if we are in a file / file output function
-  const [configFilePath, isFileMode] = getFlag(args, '--file=', null)
-
-  if (isFileMode) {
-    console.log("Entered Filemode")
-    const [out_dir, hasOutDir] = getFlag(args, '--out_dir', './data_outputs')
-    const config_file_text = readFileSync(configFilePath, 'utf8')
-    console.log(config_file_text)
-    // Need to add Try-Catch Here.
-    const commands = config_file_text.split(',').map((command) => command.split(' '))
-    for (const command of commands) {
-      let config = await produce_config(command, isFileMode, out_dir)
-      main(config)
-    }
-  } else {
-    console.log("Entered single mode")
-    let config = await produce_config(args, isFileMode, null)
-    main(config)
-  }
+function newMain() {
+  [args, errors] = parse_and_validate_args(process.argv)
 }
+
 
 async function produce_config(args, isFileMode, batchOutDir) {
   const [mode, hasModeArg] = getFlag(args, '--mode=', null)
@@ -91,102 +76,6 @@ async function produce_config(args, isFileMode, batchOutDir) {
   return config
 }
 
-async function initialize(subreddit) {
-  const tokenholder = { token: "" };
-  await check_auth_token_expired(tokenholder);
-
-  const headers = {
-    "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
-    Authorization: `Bearer ${tokenholder.token}`,
-  };
-
-  const isSfwPublic = await check_subreddit_public_sfw_exists(headers, subreddit);
-
-  if (!isSfwPublic) {
-    console.error(`Subreddit "${subreddit}" does not exist, or is not public and SFW.`);
-    process.exit(1);
-  }
-  return { headers, tokenholder, isSfwPublic };
-}
-
-async function check_auth_token_expired(tokenholder) {
-  try {
-    const tokenfile = readFileSync('token.txt', 'utf-8').split(':::');
-    const expiration = Number(tokenfile[0]);
-
-    if (expiration < ((Date.now() / 1000) - 60)) {
-      console.log("Token Expired");
-      await get_and_save_auth_token(tokenholder);
-    } else {
-      console.log("Token Still Good")
-      tokenholder.token = tokenfile[1];
-    }
-  }
-  catch (err) {
-    console.log("No token found, fetching new one...");
-    await get_and_save_auth_token(tokenholder);
-  }
-}
-
-async function get_and_save_auth_token(tokenholder) {
-  try {
-    const response = await axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
-      auth: {
-        username: process.env.REDDIT_CLIENTID,
-        password: process.env.REDDIT_SECRET
-      },
-      headers: {
-        "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
-        "Content-Type": "application/x-www-form-urlencoded"
-      }
-    });
-    const expiration_date = Math.floor(Date.now() / 1000) + response.data.expires_in;
-    tokenholder.token = response.data.access_token;
-    writeFileSync('token.txt', expiration_date + ":::" + tokenholder.token);
-    console.log("New Token Saved")
-  } catch (err) {
-    console.error("Failed to get new token:", err.response?.data || err.message);
-    throw err;
-  }
-}
-
-async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
-  try {
-    const { requests_remaining, ms_remaining } = get_request_rates()
-    if (requests_remaining === 0) {
-      console.log("Tried to run function with no requests. Wait " + ms_remaining / 60000 + " minutes before trying again");
-      process.exit(1);
-    }
-    const response = await axios.get(`https://oauth.reddit.com/r/${subreddit}/about`, {
-      headers,
-    })
-    log_request_count(1);
-
-    if (response.data.data.subreddit_type == undefined && response.data.data.over18 == undefined) {
-      subreddit_does_not_exist == true;
-      console.log("Subreddit Does Not Exist")
-    }
-    return response.data.data.subreddit_type == 'public' && !response.data.data.over18;
-  } catch (err) {
-    if (err.status == 400) {
-      console.log("Axios Bad request");
-      return false;
-    } else if (err.status == 401) {
-      console.log("Authorization Error");
-      return false;
-    } else if (err.status == 403) {
-      console.log("Private Subreddit")
-      subreddit_private = true;
-      return false;
-    } else if (err.status == 404) {
-      subreddit_does_not_exist = true;
-      return false;
-    } else {
-      console.log(err);
-      return false;
-    }
-  }
-}
 
 async function main(config) {
   const { subreddit, isFull, postLimit } = config;
@@ -202,39 +91,6 @@ async function main(config) {
   call_python_scripts();
 }
 
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
-
-function check_request_count(proposed_requests) {
-  return proposed_requests < (get_request_rates().requests_remaining);
-}
-
-function get_request_rates() {
-  let request_summary = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
-    const [count, time] = current.split(':')
-    accumulator.requests_used += Number(count)
-    accumulator.earliest_request = Math.min(Number(time), accumulator.earliest_request);
-    return accumulator;
-  }, { requests_used: 0, earliest_request: Date.now() });
-
-  return {
-    requests_used: request_summary.requests_used,
-    requests_remaining: 1000 - request_summary.requests_used,
-    window_ends_at: request_summary.earliest_request + 600000,
-    ms_remaining: request_summary.earliest_request + 600000 - Date.now()
-  }
-};
-
-function log_request_count(request_count) {
-  let log = trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(','));
-  log.push(`${request_count}:${Date.now()}`)
-  writeFileSync('requestlog.txt', log.join(','));
-}
-
-function trim_request_log(log) {
-  return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
-}
 
 async function get_posts_until(data, config,) {
 
