@@ -1,36 +1,11 @@
 import axios from "axios";
 import path from "path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { stack, mean, pipeline, env as transformersEnv } from "@xenova/transformers";
+import { stack, mean } from "@xenova/transformers";
 import { multiply, transpose } from 'mathjs';
 import dotenv from "dotenv";
 import process from 'node:process'
 dotenv.config(); // load .env file
-
-transformersEnv.allowLocalModels = true;
-transformersEnv.localModelPath = path.resolve("./models");
-transformersEnv.allowRemoteModels = false;
-
-const sentiment = await pipeline(
-  "sentiment-analysis",
-  "cardiffnlp_roberta_onnx", { dtype: 'fp32', quantized: false }
-);
-
-const embeddings = await pipeline(
-  "feature-extraction",
-  "all-MiniLM-L6-v2-onnx", { dtype: 'fp32', quantized: false }
-);
-
-import winkNLP from 'wink-nlp';
-
-// Load English language model
-import model from 'wink-eng-lite-web-model';
-
-// Get token
-const nlp = winkNLP(model, ['sbd', 'negation', 'sentiment', 'ner', 'pos']);
-const its = nlp.its;
-const as = nlp.as;
-
 
 processCLI(process.argv.slice(2))
 
