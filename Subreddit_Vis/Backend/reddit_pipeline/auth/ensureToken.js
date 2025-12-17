@@ -1,3 +1,12 @@
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, ".env") });
+
 async function check_auth_token_expired(tokenholder) {
   try {
     const tokenfile = readFileSync('token.txt', 'utf-8').split(':::');

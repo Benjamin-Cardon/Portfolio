@@ -1,81 +1,20 @@
-import axios from "axios";
+
 import path from "path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { sentiment, embeddings, nlp, its, as } from "./init/init"
 import parse_and_validate_args from "./io/parseArgs"
 import { stack, mean } from "@xenova/transformers";
 import { multiply, transpose } from 'mathjs';
-import dotenv from "dotenv";
+import { RedditAPIManager } from './limiter/RedditAPIManager'
 import process from 'node:process'
-dotenv.config(); // load .env file
-
-processCLI(process.argv.slice(2))
-
-function getFlag(args, flag, defaultVal) {
-  let rawFlag = args.find((arg) => arg.startsWith(flag))
-  let flagVal, isBool
-  if (!rawFlag) {
-    isBool = false
-    flagVal = defaultVal
-  } else {
-    isBool = true
-    flagVal = rawFlag.split('=')[1]
-  }
-  return [flagVal, isBool]
-}
 
 function newMain() {
   [args, errors] = parse_and_validate_args(process.argv)
+  const reddit = RedditAPIManager.create({ subreddit: args.subreddit, isCount: args.isCount, isFull: args.isFull, count: args.count, isBurstend: args.isBurstEnd, isBurstSleep: args.isBurstSleep })
+  const posts = await reddit.get_posts()
+  const { commentMap, postMap } = reddit.get_comments_for_posts(posts)
+
 }
-
-
-async function produce_config(args, isFileMode, batchOutDir) {
-  const [mode, hasModeArg] = getFlag(args, '--mode=', null)
-  console.log(mode)
-  // Should we consider it to be running on "Full" if we're runnning in file mode without an argument?
-  if (!(mode == 'count' || mode == 'full') || !hasModeArg) {
-    console.error('please specify mode of either "count" or "full" ');
-    process.exit(1);
-  }
-  const [subreddit, hasSubredditArg] = getFlag(args, '--subreddit=', null)
-  // subreddit is absolutely a required flag.
-  const [count, hasCountArg] = getFlag(args, '--count=', null)
-  // Count is only needed if we're running in count mode.
-  let out_dir, hasOutDir;
-  if (!batchOutDir) {
-    [out_dir, hasOutDir] = getFlag(args, '--out_dir=', './data_outputs')
-  } else {
-    out_dir = batchOutDir
-    hasOutDir = true
-  }
-
-  const [out, hasOutNameArg] = getFlag(args, '--out=', `${subreddit}_data`)
-  // if we're doing a batch, we'll want to handle output differently.
-  if (mode === 'count' && (isNaN(count) || count <= 0)) {
-    console.error('In count mode, please specify a positive numeric count.');
-    process.exit(1);
-  }
-  const [burst_mode, hasBurstModeArg] = getFlag(args, '--burst_mode=', 'end')
-  // If we have filemode, does it make sense to ever do burst mode?
-  const isCount = mode == 'count'
-  const isFull = mode == 'full';
-
-  if (isCount) {
-    if (burst_mode !== 'end' && burst_mode !== 'sleep') {
-      console.log("incorrect or no burst mode included. Defaulting to 'end' mode. In end mode, the process will end after it hits it's reddit API request limit, even if more posts or comments are available to request");
-      burst_mode = 'sleep';
-    } // Does this make sense as an argument? At this point wouldn't we really just prefer sleep?
-  }
-  const init = await initialize(subreddit);
-
-  const config = {
-    mode, isFileMode, isCount, isFull, postLimit: isCount ? count : Infinity, burst_mode, subreddit, out_dir, out, ...init
-  }
-  logStage('INIT', `Mode: ${config.mode}, Subreddit: ${config.subreddit}, Post limit: ${config.postLimit}`);
-
-  return config
-}
-
 
 async function main(config) {
   const { subreddit, isFull, postLimit } = config;
@@ -92,66 +31,6 @@ async function main(config) {
 }
 
 
-async function get_posts_until(data, config,) {
-
-  let request_count = 0;
-  const limit = 100;
-  let after = null;
-  const params = { limit };
-
-  while (data.length < config.postLimit) {
-    const { requests_remaining, ms_remaining } = get_request_rates();
-
-    if (requests_remaining === 0) {
-      console.log("There are currently no requests available.")
-      if ((config.mode === 'count' && config.burst_mode === 'sleep') || config.mode === 'full') {
-        console.log(`Waiting ${ms_remaining / 60000} minutes until beginning requests`);
-        await sleep(ms_remaining);
-      } else {
-        console.log(`Exiting early becuase of request counting error. After ${ms_remaining / 60000} minutes more requests will be available. `)
-        process.exit(1);
-      }
-    }
-    try {
-      if (after) params.after = after;
-      request_count++;
-      const response = await axios.get(`https://oauth.reddit.com/r/${config.subreddit}/new`, {
-        headers: config.headers, params
-      })
-      const children = response.data.data.children;
-      if (!children || children.length === 0) break;
-      data.push(...children)
-      after = response.data.data.after;
-      if (!after) break;
-      if (config.isFull) {
-        if (request_count % 50 == 0) {
-          log_request_count(request_count)
-          request_count = 0;
-        }
-        await sleep((ms_remaining / requests_remaining ?? 1));
-      }
-      logStage('POST_FETCH', `Requests used: ${request_count}, Posts collected: ${data.length}`);
-      if (requests_remaining == request_count && config.isCount && config.burst_mode === 'sleep') {
-        log_request_count(request_count);
-        request_count = 0;
-        console.log("Ran out of requests, sleeping until more requests available")
-        await sleep(ms_remaining);
-      }
-    } catch (err) {
-      console.error("error fetching posts:", err.message)
-      break;
-    }
-  }
-  if (data.length > config.count) {
-    data.length = config.count;
-  }
-  if (config.isFull) {
-    log_request_count(request_count % 50)
-  } else {
-    log_request_count(request_count);
-  }
-  logStage('POSTS_DONE', `Total posts: ${data.length}`);
-}
 
 async function get_comment_trees(config, data, postMap, commentMap) {
   const posts = [];
@@ -382,6 +261,7 @@ function classify_post(post) {
   const isRepliedTo = post.data.num_comments > 0;
   return { isDeletedAuthor, isAutoModAuthor, isLikelyBot, isNotValidText, isRepliedTo }
 }
+
 async function calculate_post_metrics(post, enriched_embeddings) {
   const post_metrics = {};
   post_metrics.flags = classify_post(post)

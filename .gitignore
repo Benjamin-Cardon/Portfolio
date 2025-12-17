@@ -1,8 +1,8 @@
 node_modules/
 *.env
-/Subreddit_Vis/Backend/token.txt
-/Subreddit_Vis/Backend/userreport.csv
-/Subreddit_Vis/Backend/wordreport.csv
+/Subreddit_Vis/Backend/reddit_pipeline/auth/token.txt
 /Subreddit_Vis/Backend/models
+/Subreddit_Vis/Backend/reddit_pipeline/init/models/
 /Subreddit_Vis/Backend/data.json
 /Subreddit_Vis/Backend/venv/
+/Subreddit_Vis/Backend/reddit_pipeline/data_outputs/

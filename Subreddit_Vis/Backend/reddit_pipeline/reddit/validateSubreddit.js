@@ -1,15 +1,3 @@
-
-async function initialize(subreddit) {
-
-  const isSfwPublic = await check_subreddit_public_sfw_exists(headers, subreddit);
-
-  if (!isSfwPublic) {
-    console.error(`Subreddit "${subreddit}" does not exist, or is not public and SFW.`);
-    process.exit(1);
-  }
-  return { headers, tokenholder, isSfwPublic };
-}
-
 async function check_subreddit_public_sfw_exists(headers, subreddit, subreddit_does_not_exist = false, subreddit_private = false) {
   try {
     const { requests_remaining, ms_remaining } = get_request_rates()
