@@ -99,7 +99,7 @@ export class RedditAPIManager {
   }
 
   get_request_rates() {
-    let request_summary = this.trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
+    let request_summary = this.trim_request_log(readFileSync('./reddit/requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
       const [count, time] = current.split(':')
       accumulator.requests_used += Number(count)
       accumulator.earliest_request = Math.min(Number(time), accumulator.earliest_request);
@@ -115,9 +115,9 @@ export class RedditAPIManager {
   }
 
   log_request_count(request_count) {
-    let log = this.trim_request_log(readFileSync('requestlog.txt', 'utf-8').split(','));
+    let log = this.trim_request_log(readFileSync('./reddit/requestlog.txt', 'utf-8').split(','));
     log.push(`${request_count}:${Date.now()}`)
-    writeFileSync('requestlog.txt', log.join(','));
+    writeFileSync('./reddit/requestlog.txt', log.join(','));
   }
 
   trim_request_log(log) {
@@ -184,10 +184,24 @@ export class RedditAPIManager {
     const posts = []
 
     while (posts.length < this.count) {
-      let { requests_remaining, ms_remaining, request_count, shouldStop } = await this.limitRate({ request_count, canEndEarly: true })
+      let { requests_remaining, ms_remaining } = await this.get_request_rates()
 
-      if (shouldStop) {
-        break;
+      if (requests_remaining === 0) {
+        if (this.isFull || (this.isCount && this.isBurstSleep)) {
+          if (request_count > 0) {
+            this.log_request_count(request_count)
+            request_count = 0;
+          }
+          await this.sleep(ms_remaining + 100)
+          continue
+        }
+        if (this.isCount && this.isBurstEnd) {
+          if (request_count > 0) {
+            this.log_request_count(request_count)
+            request_count = 0
+          }
+          break
+        }
       }
 
       if (after) params.after = after;
@@ -211,6 +225,12 @@ export class RedditAPIManager {
           request_count = 0;
         }
         await this.sleep((ms_remaining / requests_remaining ?? 1));
+      } else if (this.isCount && this.isBurstSleep) {
+        if (request_count >= requests_remaining) {
+          this.log_request_count(request_count);
+          request_count = 0;
+          await this.sleep(ms_remaining + 100);
+        }
       }
     }
 
@@ -230,25 +250,37 @@ export class RedditAPIManager {
     const more_nodes_request_queue = [];
     const postMap = new Map();
     const commentMap = new Map();
+    let request_count = 0
+    let { requests_remaining, ms_remaining } = this.get_request_rates();
+
     // see if we have enough requests to get all the posts:
     let isEnded = false;
-
     for (const post of posts) {
       const postId = post.data.name;
       postMap.set(postId, post);
-
-      let { requests_remaining, ms_remaining, request_count, shouldStop } =
-        await this.limitRate({
-          request_count,
-          canEndEarly: this.isCount && this.isBurstEnd,
-        });
-
-      if (shouldStop) {
-        isEnded = true;
-        post.comments = []
-        continue;
+      if (requests_remaining === 0) {
+        if (this.isFull) {
+          if (request_count > 0) {
+            this.log_request_count(request_count)
+            request_count = 0;
+          }
+          await this.sleep(ms_remaining + 100);
+          ({ requests_remaining, ms_remaining } = this.get_request_rates());
+        } else if (this.isCount && this.isBurstSleep) {
+          if (request_count > 0) {
+            this.log_request_count(request_count);
+            request_count = 0;
+          }
+          await this.sleep(ms_remaining + 100);
+          ({ requests_remaining, ms_remaining } = this.get_request_rates());
+        } else {
+          isEnded = true;
+          post.comments = [];
+          continue;
+        }
       }
-      if (!post.data.num_comments) {
+
+      if ((!post.data.num_comments) || isEnded) {
         post.comments = [];
         continue;
       }
@@ -277,16 +309,25 @@ export class RedditAPIManager {
       if (this.isFull) {
         const delay = ms_remaining / Math.max(requests_remaining, 1);
         await this.sleep(delay);
+      } else if (this.isCount && this.isBurstSleep) {
+        if (request_count >= requests_remaining) {
+          this.log_request_count(request_count);
+          request_count = 0
+          await this.sleep(ms_remaining + 100)
+            ({ requests_remaining, ms_remaining } = this.get_request_rates());
+        }
       }
     }
+    if (this.request_count > 0) {
+      this.log_request_count(request_count);
+      request_count = 0;
+    }
 
-    this.log_request_count(request_count);
-    request_count = 0;
 
-    await Promise.all(posts);
+    await Promise.all(postRequests);
 
-    for (const post of postRequests) {
-      process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.name);
+    for (const post of posts) {
+      this.process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.name);
     }
 
     ({ requests_remaining, ms_remaining } = this.get_request_rates());
@@ -297,12 +338,14 @@ export class RedditAPIManager {
         if (this.isFull) {
           await this.sleep(ms_remaining + 100);
           ({ requests_remaining, ms_remaining } = this.get_request_rates());
-        } else if (this.isCount && this.burst_mode == 'end') {
+        } else if (this.isCount && this.isBurstEnd) {
           isEnded = true;
           continue;
-        } else if (this.isCount && this.burst_mode == 'sleep') {
-          this.log_request_count(request_count);
-          request_count = 0;
+        } else if (this.isCount && this.isBurstSleep) {
+          if (request_count > 0) {
+            this.log_request_count(request_count);
+            request_count = 0;
+          }
           await this.sleep(ms_remaining + 100);
           ({ requests_remaining, ms_remaining } = this.get_request_rates());
         }
@@ -369,53 +412,6 @@ export class RedditAPIManager {
     }
     this.log_request_count(request_count);
     return { commentMap, postMap }
-  }
-
-  async limitRate({ request_count, canEndEarly }) {
-    let { requests_remaining, ms_remaining } = this.get_request_rates();
-    let newRequestCount = request_count;
-    if (requests_remaining === 0) {
-      if (this.isFull || (this.isCount && this.isBurstSleep || !canEndEarly)) {
-        this.logger?.log?.(
-          `No Reddit requests available. Sleeping for ${ms_remaining / 60000} minutes...`
-        );
-        if (newRequestCount > 0) {
-          this.log_request_count(newRequestCount);
-          newRequestCount = 0;
-        }
-        await this.sleep(ms_remaining + 100);
-        ({ requests_remaining, ms_remaining } = this.get_request_rates());
-        return {
-          requests_remaining,
-          ms_remaining,
-          request_count: newRequestCount,
-          shouldStop: false,
-        };
-      }
-      return {
-        requests_remaining,
-        ms_remaining,
-        request_count: newRequestCount,
-        shouldStop: true,
-      };
-    }
-    if (this.isCount && this.isBurstSleep && canEndEarly) {
-      if (newRequestCount >= requests_remaining) {
-        this.log_request_count(newRequestCount);
-        newRequestCount = 0;
-        this.logger?.log?.(
-          `Ran out of requests in this window; sleeping ${ms_remaining / 60000} minutes...`
-        );
-        await this.sleep(ms_remaining + 100);
-        ({ requests_remaining, ms_remaining } = this.get_request_rates());
-      }
-    }
-    return {
-      requests_remaining,
-      ms_remaining,
-      request_count: newRequestCount,
-      shouldStop: false,
-    };
   }
 
   process_comment_tree_into_map_and_queue(rootNode, commentMap, more_nodes_request_queue, postId) {
