@@ -1,12 +1,11 @@
 
 
-function reduce_comments(comments_metrics, enriched_embeddings, postMap, commentMap) {
-  const { users, words } = enriched_embeddings;
+export function reduce_comments(comments_metrics, data, postMap, commentMap) {
+  const { users, words } = data;
   for (const comment of comments_metrics) {
     if (!comment.id) {
       continue
     }
-    logStage('REDUCE_COMMENT', `Reducing comment: ${comment.id} by ${comment.author}`)
     // User summaries
     let user;
     if (!users[comment.author_id]) {
@@ -118,6 +117,6 @@ function reduce_comments(comments_metrics, enriched_embeddings, postMap, comment
       }
     }
 
-    enriched_embeddings.comments[comment.id] = comment
+    data.comments[comment.id] = comment
   }
 }

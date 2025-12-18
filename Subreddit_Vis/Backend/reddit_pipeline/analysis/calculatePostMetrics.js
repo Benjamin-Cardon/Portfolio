@@ -1,4 +1,7 @@
-export async function calculate_post_metrics(post, enriched_embeddings) {
+import { classify_post } from './classifyHelpers.js'
+import { embeddings, nlp, its, as } from "../llm_helpers/init.js"
+import { sentiment_chunker_and_aggregator } from "../llm_helpers/sentimentScore.js"
+export async function calculate_post_metrics(post, data) {
   const post_metrics = {};
   post_metrics.flags = classify_post(post)
   if (!post_metrics.flags.isRepliedTo && post_metrics.flags.isDeletedAuthor && post_metrics.flags.isNotValidText) {
@@ -23,8 +26,8 @@ export async function calculate_post_metrics(post, enriched_embeddings) {
       .out(its.lemma, as.freqTable);
     post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
     const embedding = await embeddings(text, { pooling: 'mean', normalize: true });
-    enriched_embeddings.embeddings[post.data.name] = embedding;
-    enriched_embeddings.texts[post.data.name] = text
+    data.embeddings[post.data.name] = embedding;
+    data.texts[post.data.name] = text
   }
 
   return post_metrics;

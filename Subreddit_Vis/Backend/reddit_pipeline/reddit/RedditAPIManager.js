@@ -184,8 +184,7 @@ export class RedditAPIManager {
     const posts = []
 
     while (posts.length < this.count) {
-      const { requests_remaining, ms_remaining, requestCount, shouldStop } = await this.limitRate({ requestCount: request_count, canEndEarly: true })
-      request_count = requestCount;
+      let { requests_remaining, ms_remaining, request_count, shouldStop } = await this.limitRate({ request_count, canEndEarly: true })
 
       if (shouldStop) {
         break;
@@ -238,9 +237,9 @@ export class RedditAPIManager {
       const postId = post.data.name;
       postMap.set(postId, post);
 
-      let { requests_remaining, ms_remaining, requestCount, shouldStop } =
+      let { requests_remaining, ms_remaining, request_count, shouldStop } =
         await this.limitRate({
-          requestCount: request_count,
+          request_count,
           canEndEarly: this.isCount && this.isBurstEnd,
         });
 
@@ -372,11 +371,11 @@ export class RedditAPIManager {
     return { commentMap, postMap }
   }
 
-  async limitRate({ requestCount, canEndEarly }) {
+  async limitRate({ request_count, canEndEarly }) {
     let { requests_remaining, ms_remaining } = this.get_request_rates();
-    let newRequestCount = requestCount;
+    let newRequestCount = request_count;
     if (requests_remaining === 0) {
-      if (this.isFull || (this.isCount && this.burstMode === 'sleep') || !canEndEarly) {
+      if (this.isFull || (this.isCount && this.isBurstSleep || !canEndEarly)) {
         this.logger?.log?.(
           `No Reddit requests available. Sleeping for ${ms_remaining / 60000} minutes...`
         );
@@ -389,18 +388,18 @@ export class RedditAPIManager {
         return {
           requests_remaining,
           ms_remaining,
-          requestCount: newRequestCount,
+          request_count: newRequestCount,
           shouldStop: false,
         };
       }
       return {
         requests_remaining,
         ms_remaining,
-        requestCount: newRequestCount,
+        request_count: newRequestCount,
         shouldStop: true,
       };
     }
-    if (this.isCount && this.burstMode === 'sleep' && canEndEarly) {
+    if (this.isCount && this.isBurstSleep && canEndEarly) {
       if (newRequestCount >= requests_remaining) {
         this.log_request_count(newRequestCount);
         newRequestCount = 0;
@@ -414,7 +413,7 @@ export class RedditAPIManager {
     return {
       requests_remaining,
       ms_remaining,
-      requestCount: newRequestCount,
+      request_count: newRequestCount,
       shouldStop: false,
     };
   }

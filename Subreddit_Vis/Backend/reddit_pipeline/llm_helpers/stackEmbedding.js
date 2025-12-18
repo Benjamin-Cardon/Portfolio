@@ -1,5 +1,8 @@
-function stack_average_user_embeddings(enriched_embeddings) {
-  const { users, embeddings } = enriched_embeddings;
+import { stack, mean } from "@xenova/transformers";
+import { multiply, transpose } from 'mathjs';
+
+export function stack_average_user_embeddings(data) {
+  const { users, embeddings } = data;
   for (const [user_id, user] of Object.entries(users)) {
     const text_embeddings = []
     for (const text_id of user.text_ids) {
@@ -22,7 +25,7 @@ function stack_average_user_embeddings(enriched_embeddings) {
     const invNorm = 1 / embedding_norm.data[0];  // extract scalar, take reciprocal
     const normalized = mean_embedding.mul(invNorm);
     if (!user.only_one_text) {
-      enriched_embeddings.embeddings[user_id] = normalized;
+      data.embeddings[user_id] = normalized;
     }
   }
 }

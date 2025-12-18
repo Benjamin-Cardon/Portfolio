@@ -1,15 +1,16 @@
 
-export async function calculate_comments_metrics(comments, post_fullname, enriched_embeddings) {
+import { classify_comment } from './classifyHelpers.js'
+import { embeddings, nlp, its, as } from "../llm_helpers/init.js"
+import { sentiment_chunker_and_aggregator } from "../llm_helpers/sentimentScore.js"
+export async function calculate_comments_metrics(comments, post_fullname, data) {
   let comments_metrics = [];
   for (const comment of comments) {
-    await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings)
+    await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, data)
   }
   return comments_metrics;
 }
 
-async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, enriched_embeddings) {
-  logStage('COMMENT_FLATTEN', `Flattening comment ${comment.data.id}, parent ${comment.data.parent_id}`);
-
+async function calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, data) {
   const comment_metrics = {};
   comment_metrics.flags = classify_comment(comment)
 
@@ -32,15 +33,15 @@ async function calculate_comment_metrics_tree_flatten(comments_metrics, comment,
       .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
       .out(its.lemma, as.freqTable);
 
-    enriched_embeddings.embeddings[comment.data.name] = embedding;
-    enriched_embeddings.texts[comment.data.name] = comment.data.body;
+    data.embeddings[comment.data.name] = embedding;
+    data.texts[comment.data.name] = comment.data.body;
   }
 
   comments_metrics.push(comment_metrics);
 
   if (comment_metrics.flags.isRepliedTo) {
     for (const child of comment.data.replies.data.children) {
-      await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id, enriched_embeddings);
+      await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id, data);
     }
   }
 }

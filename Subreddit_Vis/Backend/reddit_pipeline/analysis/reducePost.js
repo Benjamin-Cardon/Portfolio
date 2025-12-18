@@ -1,10 +1,9 @@
 
-function reduce_post(post_metrics, enriched_embeddings) {
+export function reduce_post(post_metrics, data) {
   if (!post_metrics.id) {
     return
   }
-  const { users, words } = enriched_embeddings
-  logStage('REDUCE_POST', `Reducing post: ${post_metrics.id} by ${post_metrics.author}`);
+  const { users, words } = data
   // Reduce user Summaries
 
   const author_id = post_metrics.author_id
@@ -102,5 +101,5 @@ function reduce_post(post_metrics, enriched_embeddings) {
       }
     }
   }
-  enriched_embeddings.posts[post_metrics.id] = post_metrics;
+  data.posts[post_metrics.id] = post_metrics;
 }
