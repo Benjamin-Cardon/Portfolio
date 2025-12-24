@@ -7,12 +7,12 @@ transformersEnv.allowLocalModels = true;
 transformersEnv.localModelPath = path.resolve("./models");
 transformersEnv.allowRemoteModels = false;
 
-export const sentiment = await pipeline(
+const sentiment = await pipeline(
   "sentiment-analysis",
   "cardiffnlp_roberta_onnx", { dtype: 'fp32', quantized: false }
 );
 
-export const embeddings = await pipeline(
+const embeddings = await pipeline(
   "feature-extraction",
   "all-MiniLM-L6-v2-onnx", { dtype: 'fp32', quantized: false }
 );
@@ -22,4 +22,4 @@ const nlp = winkNLP(model, ['sbd', 'negation', 'sentiment', 'ner', 'pos']);
 const its = nlp.its;
 const as = nlp.as;
 
-export { nlp, its, as };
+export { nlp, its, as, embeddings, sentiment };

@@ -17,7 +17,7 @@ class RedditAPIError extends Error {
   }
 }
 
-export class RedditAPIManager {
+export default class RedditAPIManager {
   constructor({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep }) {
     this.subreddit = subreddit;
     this.isCount = isCount;
