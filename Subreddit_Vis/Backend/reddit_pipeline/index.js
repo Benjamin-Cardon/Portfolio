@@ -11,18 +11,16 @@ import { nlp, its, as, embeddings, sentiment } from './llm_helpers/init.js'
 async function main() {
   const parser = new Parser()
   const tasks = parser.parseArgs(process.argv)
-  const logger = new Logger()
-  const writer = new Writer(logger)
-  const runner = new Runner(logger, writer)
-  if (parser.configParseFailure) {
-    logger.log_errors(parser.configParseErrors)
-    process.exit(1)
-  } else {
-    for (const task of tasks) {
-      runner.run(task)
-    }
-    runner.end()
+  const batch_config = parser.getBatchConfig()
+  const logger = new Logger(batch_config)
+  const writer = new Writer(logger, batch_config)
+  const runner = new Runner(logger, writer, batch_config)
+
+  for (const task of tasks) {
+    runner.run(task)
   }
+  runner.end()
+}
 
 
   // Check to see if there was a config error.
