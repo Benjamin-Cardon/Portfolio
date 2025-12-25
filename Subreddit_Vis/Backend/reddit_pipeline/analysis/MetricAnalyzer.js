@@ -2,24 +2,33 @@ import { stack, mean } from "@xenova/transformers";
 import { multiply, transpose } from 'mathjs';
 
 export default class MetricAnalyzer {
-  async calculate_metrics(posts, postMap, commentMap) {
-    const data = {
+  constructor() {
+    this.data = {
       comments: {},
       posts: {},
       words: {},
       users: {},
       embeddings: {},
       texts: {},
-    };
-
-    for (const post of posts) {
-      const post_metrics = await calculate_post_metrics(post, data);
-      const comments_metrics = await calculate_comments_metrics(post.comments, post.data.name, data);
-      reduce_post(post_metrics, data);
-      reduce_comments(comments_metrics, data, postMap, commentMap);
     }
-    stack_average_user_embeddings(data)
-    return data;
+  }
+  async calculate_metrics(posts, postMap, commentMap) {
+    try {
+      for (const post of posts) {
+        const post_metrics = await this.calculate_post_metrics(post);
+        const comments_metrics = await this.calculate_comments_metrics(post.comments, post.data.name);
+        this.reduce_post(post_metrics,);
+        this.reduce_comments(comments_metrics, postMap, commentMap);
+      }
+      this.stack_average_user_embeddings()
+    } catch (err) {
+      return { ok: false, errors: [err], users: Object.entries(this.data.users).length, words: Object.entries(this.data.words).length }
+    }
+    return { ok: true, errors: [], users: Object.entries(this.data.users).length, words: Object.entries(this.data.words).length }
+  }
+
+  getData() {
+    return this.data
   }
 
   classify_comment(comment) {
@@ -60,8 +69,8 @@ export default class MetricAnalyzer {
   }
 
 
-  reduce_comments(comments_metrics, data, postMap, commentMap) {
-    const { users, words } = data;
+  reduce_comments(comments_metrics, postMap, commentMap) {
+    const { users, words } = this.data;
     for (const comment of comments_metrics) {
       if (!comment.id) {
         continue
@@ -177,15 +186,15 @@ export default class MetricAnalyzer {
         }
       }
 
-      data.comments[comment.id] = comment
+      this.data.comments[comment.id] = comment
     }
   }
 
-  reduce_post(post_metrics, data) {
+  reduce_post(post_metrics) {
     if (!post_metrics.id) {
       return
     }
-    const { users, words } = data
+    const { users, words } = this.data
     // Reduce user Summaries
 
     const author_id = post_metrics.author_id
@@ -283,10 +292,10 @@ export default class MetricAnalyzer {
         }
       }
     }
-    data.posts[post_metrics.id] = post_metrics;
+    this.data.posts[post_metrics.id] = post_metrics;
   }
 
-  async calculate_post_metrics(post, data) {
+  async calculate_post_metrics(post) {
     const post_metrics = {};
     post_metrics.flags = classify_post(post)
     if (!post_metrics.flags.isRepliedTo && post_metrics.flags.isDeletedAuthor && post_metrics.flags.isNotValidText) {
@@ -311,22 +320,22 @@ export default class MetricAnalyzer {
         .out(its.lemma, as.freqTable);
       post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
       const embedding = await embeddings(text, { pooling: 'mean', normalize: true });
-      data.embeddings[post.data.name] = embedding;
-      data.texts[post.data.name] = text
+      this.data.embeddings[post.data.name] = embedding;
+      this.data.texts[post.data.name] = text
     }
 
     return post_metrics;
   }
 
-  async calculate_comments_metrics(comments, post_fullname, data) {
+  async calculate_comments_metrics(comments, post_fullname) {
     let comments_metrics = [];
     for (const comment of comments) {
-      await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, data)
+      await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname)
     }
     return comments_metrics;
   }
 
-  async calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname, data) {
+  async calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname) {
     const comment_metrics = {};
     comment_metrics.flags = classify_comment(comment)
 
@@ -349,15 +358,15 @@ export default class MetricAnalyzer {
         .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
         .out(its.lemma, as.freqTable);
 
-      data.embeddings[comment.data.name] = embedding;
-      data.texts[comment.data.name] = comment.data.body;
+      this.data.embeddings[comment.data.name] = embedding;
+      this.data.texts[comment.data.name] = comment.data.body;
     }
 
     comments_metrics.push(comment_metrics);
 
     if (comment_metrics.flags.isRepliedTo) {
       for (const child of comment.data.replies.data.children) {
-        await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id, data);
+        await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id);
       }
     }
   }
@@ -475,8 +484,8 @@ export default class MetricAnalyzer {
     return parts;
   }
 
-  stack_average_user_embeddings(data) {
-    const { users, embeddings } = data;
+  stack_average_user_embeddings() {
+    const { users, embeddings } = this.data;
     for (const [user_id, user] of Object.entries(users)) {
       const text_embeddings = []
       for (const text_id of user.text_ids) {
@@ -499,7 +508,7 @@ export default class MetricAnalyzer {
       const invNorm = 1 / embedding_norm.data[0];  // extract scalar, take reciprocal
       const normalized = mean_embedding.mul(invNorm);
       if (!user.only_one_text) {
-        data.embeddings[user_id] = normalized;
+        this.data.embeddings[user_id] = normalized;
       }
     }
   }

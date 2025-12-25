@@ -59,7 +59,7 @@ export default class RedditAPIManager {
 
   save_auth_token(token, expires_in) {
     const expiration_date = Math.floor(Date.now() / 1000) + Number(expires_in);
-    writeFileSync('token.txt', expiration_date + ":::" + token);
+    writeFileSync('./api/token.txt', expiration_date + ":::" + token);
   }
 
   async get_auth_token() {
@@ -79,7 +79,7 @@ export default class RedditAPIManager {
 
   check_auth_token_expired() {
     try {
-      if (!existsSync("token.txt")) {
+      if (!existsSync("./api/token.txt")) {
         this.errors.push({
           level: 'warning',
           stage: 'API Init',
@@ -88,7 +88,7 @@ export default class RedditAPIManager {
         return "";
       }
 
-      const contents = readFileSync("token.txt", "utf-8");
+      const contents = readFileSync("./api/token.txt", "utf-8");
       const [expStr, token] = contents.split(":::");
       const expiration = Number(expStr);
 
@@ -215,7 +215,7 @@ export default class RedditAPIManager {
   get_request_rates() {
     let rawLog = "";
     try {
-      rawLog = readFileSync('./reddit/requestlog.txt', 'utf-8');
+      rawLog = readFileSync('./api/requestlog.txt', 'utf-8');
     } catch (err) {
       this.errors.push({
         level: "warning",
@@ -243,7 +243,7 @@ export default class RedditAPIManager {
     if (this.unlogged_requests == 0) return;
     let rawLog = "";
     try {
-      rawLog = readFileSync('./reddit/requestlog.txt', 'utf-8');
+      rawLog = readFileSync('./api/requestlog.txt', 'utf-8');
     } catch (err) {
       this.errors.push({
         level: "warning",
@@ -255,7 +255,7 @@ export default class RedditAPIManager {
     }
     let log = this.trim_request_log(rawLog.split(','));
     log.push(`${this.unlogged_requests}:${Date.now()}`)
-    writeFileSync('./reddit/requestlog.txt', log.join(','));
+    writeFileSync('./api/requestlog.txt', log.join(','));
     this.unlogged_requests = 0;
 
   }
@@ -341,9 +341,9 @@ export default class RedditAPIManager {
         info: "Unknown Error",
         err
       })
-      return { ok: false, posts: this.posts.length, requests_made: this.requests_made, this.errors }
+      return { ok: false, posts: this.posts.length, requests_made: this.requests_made, errors: this.errors }
     }
-    return { ok: true, posts: this.posts.length, requests_made: this.requests_made, this.errors }
+    return { ok: true, posts: this.posts.length, requests_made: this.requests_made, errors: this.errors }
   }
 
   async get_comments_for_posts() {
@@ -454,9 +454,9 @@ export default class RedditAPIManager {
         info: "Unknown Error",
         err
       })
-      return { ok: false, comments: this.commentMap.size, requests_made: this.requests_made, this.errors }
+      return { ok: false, comments: this.commentMap.size, requests_made: this.requests_made, errors: this.errors }
     }
-    return { ok: true, comments: this.commentMap.size, requests_made: this.requests_made, this.errors }
+    return { ok: true, comments: this.commentMap.size, requests_made: this.requests_made, errors: this.errors }
   }
 
   process_comment_tree_into_map_and_queue(rootNode, more_nodes_request_queue, postId) {

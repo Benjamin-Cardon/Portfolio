@@ -1,7 +1,7 @@
 import MetricAnalyzer from './MetricAnalyzer.js'
 import RedditAPIManager from '../api/RedditAPIManager.js'
 import path from 'path'
-export class Runner {
+export default class Runner {
   constructor(Logger, Writer, batch_config) {
     this.logger = Logger;
     this.writer = Writer;
@@ -44,7 +44,7 @@ export class Runner {
       outputPath: path.join(this.out_dir, Task.args.out),
     }
 
-    const api = new RedditAPIManager(Task);
+    const api = new RedditAPIManager(Task.args);
 
     const initResult = await api.init();
     //check init result.\
@@ -99,7 +99,7 @@ export class Runner {
 
     const analyzer = new MetricAnalyzer();
 
-    const calculateResult = analyzer.calculate_metrics(api.posts, api.postMap, api.commentMap)
+    const calculateResult = await analyzer.calculate_metrics(api.posts, api.postMap, api.commentMap)
     taskSummary.users = calculateResult.users;
     taskSummary.words = calculateResult.words;
 
@@ -128,5 +128,8 @@ export class Runner {
     taskSummary.taskSucceeded = true;
     this.taskSummaries.push(taskSummary);
     this.writer.write(finalResult)
+  }
+  end() {
+    // log results and write manifest.
   }
 }
