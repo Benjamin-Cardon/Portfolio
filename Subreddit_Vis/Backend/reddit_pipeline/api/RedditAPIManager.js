@@ -2,7 +2,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -21,105 +21,121 @@ export default class RedditAPIManager {
     this.posts = [];
     this.postMap = new Map();
     this.commentMap = new Map();
+    this.requests_remaining = 0;
+    this.requests_made = 0;
+    this.unlogged_requests = 0;
+    this.ms_remaining = 0;
+    this.window_ends_at = 0;
+    this.end_requests = false;
+    this.token = "";
+    this.errors = []
   }
-
 
   async init() {
-    this.token = this.check_auth_token_expired();
+    this.token = this.check_auth_token_expired()
+
     if (!this.token) {
-      const [token, expires_in] = await this.get_auth_token()
-      this.token = token
-      this.save_auth_token(expires_in, token)
+      try {
+        const [token, expires_in] = await this.get_auth_token()
+        this.token = token;
+        this.save_auth_token(token, expires_in)
+      }
+      catch (err) {
+        this.errors.push({
+          level: 'fatal',
+          stage: 'auth',
+          info: 'Failed to authorize with reddit client',
+          err
+        })
+        return { ok: false, requests_made: this.requests_made, errors: this.errors }
+      }
     }
-    const ok = await this.check_subreddit_public_sfw_exists()
-    return ok;
+    const isValidSubreddit = await this.check_subreddit_public_sfw_exists()
+    if (!isValidSubreddit) {
+      return { ok: false, requests_made: this.requests_made, errors: this.errors }
+    }
+    return { ok: true, requests_made: this.requests_made, errors: this.errors };
   }
 
-  save_auth_token(expires_in, token) {
-    const expiration_date = Math.floor(Date.now() / 1000) + expires_in;
+  save_auth_token(token, expires_in) {
+    const expiration_date = Math.floor(Date.now() / 1000) + Number(expires_in);
     writeFileSync('token.txt', expiration_date + ":::" + token);
   }
 
   async get_auth_token() {
-    try {
-      const response = await axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
-        auth: {
-          username: process.env.REDDIT_CLIENTID,
-          password: process.env.REDDIT_SECRET
-        },
-        headers: {
-          "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
-          "Content-Type": "application/x-www-form-urlencoded"
-        }
-      });
-      return [response.data.access_token, response.data.expires_in]
-    } catch (err) {
-      this.errorState = err.response.status;
-      this.error = err;
-      throw new RedditAPIError("AUTH_FAILED", "Failed to get new token", {
-        status: err.response?.status,
-        data: err.response?.data,
-      });
-    }
+    const response = await axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
+      auth: {
+        username: process.env.REDDIT_CLIENTID,
+        password: process.env.REDDIT_SECRET
+      },
+      headers: {
+        "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
+        "Content-Type": "application/x-www-form-urlencoded"
+      }
+    });
+    return [response.data.access_token, response.data.expires_in]
   }
+
 
   check_auth_token_expired() {
     try {
-      const tokenfile = readFileSync('token.txt', 'utf-8').split(':::');
-      const expiration = Number(tokenfile[0]);
-
-      if (expiration < ((Date.now() / 1000) - 60)) {
-        return ""
-      } else {
-        return tokenfile[1];
+      if (!existsSync("token.txt")) {
+        this.errors.push({
+          level: 'warning',
+          stage: 'API Init',
+          info: 'No Auth token file to be read.If this is your first run, not an issue.'
+        })
+        return "";
       }
+
+      const contents = readFileSync("token.txt", "utf-8");
+      const [expStr, token] = contents.split(":::");
+      const expiration = Number(expStr);
+
+      if (!token || Number.isNaN(expiration)) {
+        this.errors.push({
+          level: 'warning',
+          stage: 'API Init',
+          info: 'malformed or corrupted cached token file. Attempting to get new token.'
+        })
+        return "";
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+
+      if (expiration < now - 60) {
+        return "";
+      }
+
+      return token;
+    } catch (err) {
+      this.errors.push({
+        level: 'warning',
+        stage: 'API Init',
+        info: 'Unknown error while fetching cached auth token. Attempting to get new token',
+        err
+      })
+      return "";
     }
-    catch (err) {
-      return ""
-    }
-  }
-
-  sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
-  }
-
-  check_request_count(proposed_requests) {
-    return proposed_requests < (this.get_request_rates().requests_remaining);
-  }
-
-  get_request_rates() {
-    let request_summary = this.trim_request_log(readFileSync('./reddit/requestlog.txt', 'utf-8').split(',')).reduce((accumulator, current) => {
-      const [count, time] = current.split(':')
-      accumulator.requests_used += Number(count)
-      accumulator.earliest_request = Math.min(Number(time), accumulator.earliest_request);
-      return accumulator;
-    }, { requests_used: 0, earliest_request: Date.now() });
-
-    return {
-      requests_used: request_summary.requests_used,
-      requests_remaining: 1000 - request_summary.requests_used,
-      window_ends_at: request_summary.earliest_request + 600000,
-      ms_remaining: request_summary.earliest_request + 600000 - Date.now()
-    }
-  }
-
-  log_request_count(request_count) {
-    let log = this.trim_request_log(readFileSync('./reddit/requestlog.txt', 'utf-8').split(','));
-    log.push(`${request_count}:${Date.now()}`)
-    writeFileSync('./reddit/requestlog.txt', log.join(','));
-  }
-
-  trim_request_log(log) {
-    return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
   }
 
   async check_subreddit_public_sfw_exists() {
     try {
-      const { requests_remaining, ms_remaining } = this.get_request_rates()
-      if (requests_remaining === 0) {
-        this.error = new SubredditAPIError("Init_failed", "Tried to initialize with no requests available ", { ms_remaining })
-        this.errorState = 1
-        throw this.error;
+      this.get_request_rates()
+      if (this.requests_remaining == 0) {
+        if (this.isFull || this.isBurstSleep) {
+          await this.sleep(ms_remaining + 100)
+          this.get_request_rates()
+        }
+        else {
+          this.errors.push({
+            level: "fatal",
+            stage: 'API Init',
+            info: "Attempted to run process in end mode with no requests.",
+            err: null
+          })
+          return false
+        }
       }
 
       const headers = {
@@ -128,73 +144,157 @@ export default class RedditAPIManager {
       };
       this.headers = headers
 
+      this.increment_requests()
+      this.log_request_count()
+
       const response = await axios.get(`https://oauth.reddit.com/r/${this.subreddit}/about`, {
         headers,
       })
-      this.log_request_count(1);
 
-      if (response.data.data.subreddit_type == undefined && response.data.data.over18 == undefined) {
-        this.error = new SubredditAPIError("Subreddit_Error", "Subreddit Does not exist", {})
-        this.errorState = 1
-        throw this.error;
+      if (response.data.data.over18) {
+        this.errors.push({
+          level: "fatal",
+          stage: 'API Init',
+          info: "This subreddit is marked NSFW. I suppose you can remove the code to block this if you'd like, but I wrote this assuming the tool would be used in a work context",
+          err: null
+        })
+        return false
       }
 
-      return response.data.data.subreddit_type == 'public' && !response.data.data.over18;
+      return true;
     } catch (err) {
       const status = err.response?.status;
-      const data = err.response?.data;
       if (status == 400) {
-        this.error = new SubredditAPIError("Axios_Error", "", { status, data })
-        this.errorState = 1
+        this.errors.push({
+          level: "fatal",
+          stage: 'API Init:Authorization',
+          info: "Axios Error",
+          err
+        })
         return false;
       } else if (status == 401) {
-        this.error = new SubredditAPIError("Authorization_Error", "", { status, data })
-        this.errorState = 1
+        this.errors.push({
+          level: "fatal",
+          stage: 'API Init',
+          info: "Authorization Error",
+          err
+        })
         return false;
       } else if (status == 403) {
-        this.error = new SubredditAPIError("Private_Subreddit", "", { status, data })
-        this.errorState = 1
+        this.errors.push({
+          level: "fatal",
+          stage: 'API Init',
+          info: "Private Subreddit",
+          err
+        })
         return false;
       } else if (status == 404) {
-        this.error = new SubredditAPIError("Subreddit_DoesNotExist", "", { status, data })
-        this.errorState = 1
+        this.errors.push({
+          level: "fatal",
+          stage: 'API Init',
+          info: "Subreddit Does Not Exist",
+          err
+        })
         return false;
       } else {
+        this.errors.push({
+          level: "fatal",
+          stage: 'API Init',
+          info: "General API Init failure",
+          err
+        })
         return false;
       }
     }
   }
 
+  sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  get_request_rates() {
+    let rawLog = "";
+    try {
+      rawLog = readFileSync('./reddit/requestlog.txt', 'utf-8');
+    } catch (err) {
+      this.errors.push({
+        level: "warning",
+        stage: "api",
+        info: "Issue when trying to read the request log. It may be that it simply does not exist, in which case, no worries, it'll be produced by running the file.",
+        err
+      })
+      rawLog = "";
+    }
+    let request_summary = this.trim_request_log(rawLog.split(',')).reduce((accumulator, current) => {
+      const [count, time] = current.split(':')
+      accumulator.requests_used += Number(count)
+      accumulator.earliest_request = Math.min(Number(time), accumulator.earliest_request);
+      return accumulator;
+    }, { requests_used: 0, earliest_request: Date.now() });
+    this.requests_remaining = 1000 - request_summary.requests_used;
+    this.window_ends_at = request_summary.earliest_request + 600000;
+    this.ms_remaining = request_summary.earliest_request + 600000 - Date.now();
+    if (request_summary.requests_used === 0) {
+      this.ms_remaining = 1;
+    }
+  }
+
+  log_request_count() {
+    if (this.unlogged_requests > 0) {
+      let log = this.trim_request_log(readFileSync('./reddit/requestlog.txt', 'utf-8').split(','));
+      log.push(`${this.unlogged_requests}:${Date.now()}`)
+      writeFileSync('./reddit/requestlog.txt', log.join(','));
+      this.unlogged_requests = 0;
+    }
+  }
+
+  trim_request_log(log) {
+    return log.filter((x) => x.split(':')[1] > Date.now() - 600000)
+  }
+
+  async sleep_until_refresh_if_appropriate() {
+    if (this.requests_remaining <= this.unlogged_requests && (this.isFull || (this.isCount && this.isBurstSleep))) {
+      this.log_request_count()
+      await this.sleep(this.ms_remaining + 100)
+      this.get_request_rates()
+    }
+  }
+
+  increment_requests() {
+    this.unlogged_requests++;
+    this.requests_made++;
+  }
+
+  async pace_requests_if_appropriate() {
+    if (this.isFull) {
+      const delay = this.ms_remaining / Math.max(this.requests_remaining, 1);
+      await this.sleep(delay);
+    }
+  }
+
+  check_end() {
+    if ((this.requests_remaining <= this.unlogged_requests && this.isCount && this.isBurstEnd) || this.end_requests) {
+      this.log_request_count()
+      this.end_requests = true;
+      return true;
+    }
+    return false;
+  }
+
   async get_posts() {
-    let request_count = 0;
     const limit = 100;
     let after = null;
     const params = { limit };
-    const posts = []
+    this.get_request_rates()
 
-    while (posts.length < this.count) {
-      let { requests_remaining, ms_remaining } = await this.get_request_rates()
-
-      if (requests_remaining === 0) {
-        if (this.isFull || (this.isCount && this.isBurstSleep)) {
-          if (request_count > 0) {
-            this.log_request_count(request_count)
-            request_count = 0;
-          }
-          await this.sleep(ms_remaining + 100)
-          continue
-        }
-        if (this.isCount && this.isBurstEnd) {
-          if (request_count > 0) {
-            this.log_request_count(request_count)
-            request_count = 0
-          }
-          break
-        }
+    while (this.posts.length < this.count) {
+      await this.sleep_until_refresh_if_appropriate();
+      if (this.check_end()) {
+        break;
       }
 
       if (after) params.after = after;
-      request_count++;
+      this.increment_requests()
 
       const response = await axios.get(`https://oauth.reddit.com/r/${this.subreddit}/new`, {
         headers: this.headers, params
@@ -203,23 +303,17 @@ export default class RedditAPIManager {
       const children = response.data.data.children;
       if (!children || children.length === 0) break;
 
-      posts.push(...children)
+      this.posts.push(...children)
       after = response.data.data.after;
 
       if (!after) break;
 
       if (this.isFull) {
-        if (request_count % 50 == 0) {
-          this.log_request_count(request_count)
-          request_count = 0;
+        if (this.unlogged_requests % 50 == 0) {
+          this.log_request_count();
+          this.get_request_rates();
         }
-        await this.sleep((ms_remaining / requests_remaining ?? 1));
-      } else if (this.isCount && this.isBurstSleep) {
-        if (request_count >= requests_remaining) {
-          this.log_request_count(request_count);
-          request_count = 0;
-          await this.sleep(ms_remaining + 100);
-        }
+        await this.sleep((this.ms_remaining / this.requests_remaining ?? 1));
       }
     }
 
@@ -227,55 +321,33 @@ export default class RedditAPIManager {
       posts.length = this.count;
     }
 
-    if (request_count > 0) {
-      this.log_request_count(request_count)
-    }
-
-    return posts
+    this.log_request_count()
+    return {}
   }
 
-  async get_comments_for_posts(posts) {
+  async get_comments_for_posts() {
     const postRequests = [];
     const more_nodes_request_queue = [];
-    const postMap = new Map();
-    const commentMap = new Map();
-    let request_count = 0
-    let { requests_remaining, ms_remaining } = this.get_request_rates();
+    this.log_request_count()
+    this.get_request_rates();
 
     // see if we have enough requests to get all the posts:
-    let isEnded = false;
-    for (const post of posts) {
+    for (const post of this.posts) {
       const postId = post.data.name;
-      postMap.set(postId, post);
-      if (requests_remaining === 0) {
-        if (this.isFull) {
-          if (request_count > 0) {
-            this.log_request_count(request_count)
-            request_count = 0;
-          }
-          await this.sleep(ms_remaining + 100);
-          ({ requests_remaining, ms_remaining } = this.get_request_rates());
-        } else if (this.isCount && this.isBurstSleep) {
-          if (request_count > 0) {
-            this.log_request_count(request_count);
-            request_count = 0;
-          }
-          await this.sleep(ms_remaining + 100);
-          ({ requests_remaining, ms_remaining } = this.get_request_rates());
-        } else {
-          isEnded = true;
-          post.comments = [];
-          continue;
-        }
-      }
+      this.postMap.set(postId, post);
+      await this.sleep_until_refresh_if_appropriate();
 
-      if ((!post.data.num_comments) || isEnded) {
+      if (check_end()) {
         post.comments = [];
         continue;
       }
 
-      request_count++;
-      requests_remaining--;
+      if ((!post.data.num_comments)) {
+        post.comments = [];
+        continue;
+      }
+
+      this.increment_requests()
 
       postRequests.push(axios
         .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers: this.headers })
@@ -290,120 +362,72 @@ export default class RedditAPIManager {
       );
 
       if (this.isFull && request_count % 50 === 0) {
-        this.log_request_count(request_count);
-        request_count = 0;
-        ({ requests_remaining, ms_remaining } = this.get_request_rates());
+        this.log_request_count();
+        this.get_request_rates();
       }
-
-      if (this.isFull) {
-        const delay = ms_remaining / Math.max(requests_remaining, 1);
-        await this.sleep(delay);
-      } else if (this.isCount && this.isBurstSleep) {
-        if (request_count >= requests_remaining) {
-          this.log_request_count(request_count);
-          request_count = 0
-          await this.sleep(ms_remaining + 100)
-            ({ requests_remaining, ms_remaining } = this.get_request_rates());
-        }
-      }
-    }
-    if (this.request_count > 0) {
-      this.log_request_count(request_count);
-      request_count = 0;
+      await pace_requests_if_appropriate()
     }
 
-
+    this.log_request_count();
     await Promise.all(postRequests);
 
-    for (const post of posts) {
-      this.process_comment_tree_into_map_and_queue(post, commentMap, more_nodes_request_queue, post.data.name);
+    for (const post of this.posts) {
+      this.process_comment_tree_into_map_and_queue(post, more_nodes_request_queue, post.data.name);
     }
 
-    ({ requests_remaining, ms_remaining } = this.get_request_rates());
+    this.get_request_rates()
+    while (more_nodes_request_queue.length && !this.end_requests) {
+      await this.sleep_until_refresh_if_appropriate();
 
-    while (more_nodes_request_queue.length && !isEnded) {
-
-      if (requests_remaining === 0) {
-        if (this.isFull) {
-          await this.sleep(ms_remaining + 100);
-          ({ requests_remaining, ms_remaining } = this.get_request_rates());
-        } else if (this.isCount && this.isBurstEnd) {
-          isEnded = true;
-          continue;
-        } else if (this.isCount && this.isBurstSleep) {
-          if (request_count > 0) {
-            this.log_request_count(request_count);
-            request_count = 0;
-          }
-          await this.sleep(ms_remaining + 100);
-          ({ requests_remaining, ms_remaining } = this.get_request_rates());
-        }
-      }
-
-      requests_remaining--;
-      request_count++;
+      this.increment_requests();
 
       const req = more_nodes_request_queue.shift();
       const { parentNode, childrenIds } = req;
-      // console.log(req)
       const url = `https://oauth.reddit.com/api/morechildren?api_type=json&raw_json=1&link_id=${req.postId}&children=${childrenIds.join(",")}`;
-      try {
-        const res = await axios.get(url, { headers: this.headers });
-        const newChildren = res.data.json.data.things; // array of 't1' comments
-        logStage('MORE_CHILDREN', `Queued ${newChildren.length} extra nodes`);
-        for (const child of newChildren) {
-          if (child.kind == 'more') {
-            more_nodes_request_queue.push({
-              parentNode: parentNode,  // direct reference
-              postId: req.postId,
-              childrenIds: child.data.children,
-            });
-            logStage('MORE_NODES', `Queued ${child.data.children.length} extra nodes`);
+      const res = await axios.get(url, { headers: this.headers });
+      const newChildren = res.data.json.data.things; // array of 't1' comments
+      for (const child of newChildren) {
+        if (child.kind == 'more') {
+          more_nodes_request_queue.push({
+            parentNode: parentNode,  // direct reference
+            postId: req.postId,
+            childrenIds: child.data.children,
+          });
+        } else {
+          this.commentMap.set(child.data.name, child)
+          this.process_comment_tree_into_map_and_queue(child, more_nodes_request_queue, req.postId)
+        }
+      }
+      newChildren.forEach((child) => {
+        if (child.kind == 'more') {
+          return;
+        }
+        if (child.data.parent_id.slice(0, 2) == 't3') {
+          this.postMap.get(child.data.parent_id).comments.push(child);
+        } else if (child.data.parent_id.slice(0, 2) == 't1') {
+          const parentComment = this.commentMap.get(child.data.parent_id);
+          if (parentComment.data.replies === "") {
+            parentComment.data.replies = {
+              kind: "Listing",
+              data: { children: [child] },
+            };
+          } else if (parentComment.data.replies?.data?.children) {
+            parentComment.data.replies.data.children.push(child);
           } else {
-            commentMap.set(child.data.name, child)
-            process_comment_tree_into_map_and_queue(child, commentMap, more_nodes_request_queue, req.postId)
+            // Fallback: if replies got into some weird shape, normalize
+            parentComment.data.replies = {
+              kind: "Listing",
+              data: { children: [child] },
+            };
           }
         }
-        newChildren.forEach((child) => {
-          if (child.kind == 'more') {
-            return;
-          }
-          if (child.data.parent_id.slice(0, 2) == 't3') {
-            postMap.get(child.data.parent_id).comments.push(child);
-          } else if (child.data.parent_id.slice(0, 2) == 't1') {
-            const parentComment = commentMap.get(child.data.parent_id);
-            if (parentComment.data.replies === "") {
-              parentComment.data.replies = {
-                kind: "Listing",
-                data: { children: [child] },
-              };
-            } else if (parentComment.data.replies?.data?.children) {
-              parentComment.data.replies.data.children.push(child);
-            } else {
-              // Fallback: if replies got into some weird shape, normalize
-              parentComment.data.replies = {
-                kind: "Listing",
-                data: { children: [child] },
-              };
-            }
-          }
-        })
-        if (this.isFull) { await sleep(ms_remaining / Math.max(requests_remaining, 1)); }
-      } catch (err) {
-        console.error("Error fetching morechildren:", {
-          url,
-          message: err.message,
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-        });
-      }
+      })
+      await this.pace_requests_if_appropriate();
     }
-    this.log_request_count(request_count);
-    return { commentMap, postMap }
+    this.log_request_count();
   }
 
-  process_comment_tree_into_map_and_queue(rootNode, commentMap, more_nodes_request_queue, postId) {
+  process_comment_tree_into_map_and_queue(rootNode, more_nodes_request_queue, postId) {
     let queue = [];
     if (rootNode.kind === 't3') { // post
       queue = [...(rootNode.comments || [])];
@@ -412,12 +436,11 @@ export default class RedditAPIManager {
         ? [...rootNode.data.replies.data.children]
         : [];
     }
-
     while (queue.length > 0) {
       const node = queue.shift();
 
       if (node.kind === 't1') {
-        commentMap.set(node.data.name, node);
+        this.commentMap.set(node.data.name, node);
 
         // Push replies if they exist
         if (node.data.replies && node.data.replies.data) {
@@ -429,13 +452,13 @@ export default class RedditAPIManager {
           //More node is just a placeholder in these cases
           continue;
         }
+
         more_nodes_request_queue.push({
           parentNode: node,   // direct reference
           postId: postId,     // passed in
           childrenIds: node.data.children,
         });
       } else {
-
       }
     }
   }

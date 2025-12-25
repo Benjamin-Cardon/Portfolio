@@ -17,7 +17,7 @@ async function main() {
   const writer = new Writer(logger, batch_config)
   const runner = new Runner(logger, writer, batch_config)
   for (const task of tasks) {
-    runner.run(task)
+    await runner.run(task)
   }
   runner.end()
 }

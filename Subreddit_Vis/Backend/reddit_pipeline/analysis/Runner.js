@@ -11,7 +11,6 @@ export class Runner {
   }
 
   async run(Task) {
-
     if (!Task.taskWellFormed) {
       this.writer.write({ taskSucceeded: false, data: "__null__", errors: Task.errors, Task })
       this.taskSummaries.push({
