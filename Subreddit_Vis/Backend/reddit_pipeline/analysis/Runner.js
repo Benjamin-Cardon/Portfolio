@@ -12,6 +12,7 @@ export default class Runner {
 
   async run(Task) {
     if (!Task.taskWellFormed) {
+      this.logger.log('info', `Task not well formed.`)
       this.writer.write({ taskSucceeded: false, data: "__null__", errors: Task.errors, Task })
       this.taskSummaries.push({
         requests_made: 0,
@@ -43,14 +44,18 @@ export default class Runner {
       timeEnded: null,
       outputPath: path.join(this.out_dir, Task.args.out),
     }
+    this.logger.log('info', `Beginning task for subreddit ${Task.args.subreddit}.`)
 
     const api = new RedditAPIManager(Task.args);
+
+    this.logger.log('info', `Beginning initialization.`)
 
     const initResult = await api.init();
     //check init result.\
     taskSummary.requests_made = initResult.requests_made;
 
     if (!initResult.ok) {
+      this.logger.log('info', `Error at initialization stage.`)
       taskSummary.error_stage = "API_Initalization"
       taskSummary.timeEnded = new Date().toISOString()
       this.taskSummaries.push(taskSummary);
@@ -62,12 +67,14 @@ export default class Runner {
       })
       return;
     }
-
+    this.logger.log('info', `initialization of subreddit: ${Task.args.subreddit} successful.`)
+    this.logger.log('info', `Getting posts.`)
     const postResult = await api.get_posts();
     taskSummary.posts = postResult.posts;
     taskSummary.requests_made = postResult.requests_made;
 
     if (!postResult.ok) {
+      this.logger.log('info', `Error while getting posts.`)
       taskSummary.error_stage = "Getting_Posts"
       taskSummary.timeEnded = new Date().toISOString()
       this.taskSummaries.push(taskSummary);
@@ -79,12 +86,15 @@ export default class Runner {
       })
       return;
     }
+    this.logger.log('info', `Successfully got posts.`)
 
+    this.logger.log('info', `Getting Comments.`)
     const commentResult = await api.get_comments_for_posts()
     taskSummary.comments = commentResult.comments;
     taskSummary.requests_made = commentResult.requests_made;
 
     if (!commentResult.ok) {
+      this.logger.log('info', `Error while forming comment trees.`)
       taskSummary.error_stage = "Getting_Comments"
       taskSummary.timeEnded = new Date().toISOString()
       this.taskSummaries.push(taskSummary);
@@ -96,7 +106,8 @@ export default class Runner {
       })
       return;
     }
-
+    this.logger.log('info', `Successfully got comments.`)
+    this.logger.log('info', `Beginning to Analyze Metrics.`)
     const analyzer = new MetricAnalyzer();
 
     const calculateResult = await analyzer.calculate_metrics(api.posts, api.postMap, api.commentMap)
@@ -104,6 +115,7 @@ export default class Runner {
     taskSummary.words = calculateResult.words;
 
     if (!calculateResult.ok) {
+      this.logger.log('info', `Error while calculating Metrics.`)
       taskSummary.error_stage = "Calculating Metrics"
       taskSummary.timeEnded = new Date().toISOString()
       this.taskSummaries.push(taskSummary);
@@ -115,7 +127,7 @@ export default class Runner {
       })
       return;
     }
-
+    this.logger.log('info', `Successfully calculated Metrics.`)
     const data = analyzer.getData();
     const finalResult = {
       taskSucceeded: true,
@@ -123,7 +135,7 @@ export default class Runner {
       errors: [],
       Task,
     }
-
+    this.logger.log('info', `Task suceeded.`)
     taskSummary.timeEnded = new Date().toISOString()
     taskSummary.taskSucceeded = true;
     this.taskSummaries.push(taskSummary);

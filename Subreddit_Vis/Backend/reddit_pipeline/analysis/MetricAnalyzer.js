@@ -1,5 +1,6 @@
 import { stack, mean } from "@xenova/transformers";
 import { multiply, transpose } from 'mathjs';
+import { nlp, its, as, sentiment, embeddings } from '../init/init.js'
 
 export default class MetricAnalyzer {
   constructor() {
@@ -22,7 +23,12 @@ export default class MetricAnalyzer {
       }
       this.stack_average_user_embeddings()
     } catch (err) {
-      return { ok: false, errors: [err], users: Object.entries(this.data.users).length, words: Object.entries(this.data.words).length }
+      const normalizedError = {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      };
+      return { ok: false, errors: [normalizedError], users: Object.entries(this.data.users).length, words: Object.entries(this.data.words).length }
     }
     return { ok: true, errors: [], users: Object.entries(this.data.users).length, words: Object.entries(this.data.words).length }
   }
@@ -297,7 +303,7 @@ export default class MetricAnalyzer {
 
   async calculate_post_metrics(post) {
     const post_metrics = {};
-    post_metrics.flags = classify_post(post)
+    post_metrics.flags = this.classify_post(post)
     if (!post_metrics.flags.isRepliedTo && post_metrics.flags.isDeletedAuthor && post_metrics.flags.isNotValidText) {
       //The post has no author, text, or comments. It is a non-post.
       return post_metrics
@@ -318,7 +324,7 @@ export default class MetricAnalyzer {
       post_metrics.frequency_table = doc.tokens()
         .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
         .out(its.lemma, as.freqTable);
-      post_metrics.sentiment = await sentiment_chunker_and_aggregator(text);
+      post_metrics.sentiment = await this.sentiment_chunker_and_aggregator(text);
       const embedding = await embeddings(text, { pooling: 'mean', normalize: true });
       this.data.embeddings[post.data.name] = embedding;
       this.data.texts[post.data.name] = text
@@ -330,14 +336,14 @@ export default class MetricAnalyzer {
   async calculate_comments_metrics(comments, post_fullname) {
     let comments_metrics = [];
     for (const comment of comments) {
-      await calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname)
+      await this.calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname)
     }
     return comments_metrics;
   }
 
   async calculate_comment_metrics_tree_flatten(comments_metrics, comment, post_fullname) {
     const comment_metrics = {};
-    comment_metrics.flags = classify_comment(comment)
+    comment_metrics.flags = this.classify_comment(comment)
 
     const text = comment.data.body;
 
@@ -353,7 +359,7 @@ export default class MetricAnalyzer {
     comment_metrics.rough_fuzzed_controversy = Math.log(comment.data.ups) - Math.log(comment.data.score);
     if (!comment_metrics.flags.isNotValidText) {
       const embedding = await embeddings(comment.data.body, { pooling: 'mean', normalize: true })
-      comment_metrics.sentiment = await sentiment_chunker_and_aggregator(comment.data.body);
+      comment_metrics.sentiment = await this.sentiment_chunker_and_aggregator(comment.data.body);
       comment_metrics.frequency_table = nlp.readDoc(text).tokens()
         .filter((e) => (!e.out(its.stopWordFlag) && (e.out(its.type) == 'word')))
         .out(its.lemma, as.freqTable);
@@ -366,13 +372,13 @@ export default class MetricAnalyzer {
 
     if (comment_metrics.flags.isRepliedTo) {
       for (const child of comment.data.replies.data.children) {
-        await calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id);
+        await this.calculate_comment_metrics_tree_flatten(comments_metrics, child, comment_metrics.post_id);
       }
     }
   }
   async sentiment_chunker_and_aggregator(text) {
     // if the text is less than 512 characters long, there is no need to chunk it.
-    const chunks = chunk_text(text);
+    const chunks = this.chunk_text(text);
     const chunk_promises = chunks.map(async (chunk) => {
       let labels = await sentiment(chunk, { topk: null });
       return {
@@ -405,7 +411,7 @@ export default class MetricAnalyzer {
     const paragraphs = text.split(/\n\s*\n/);
 
     for (const paragraph of paragraphs) {
-      chunks.push(...chunk_paragraph(paragraph));
+      chunks.push(...this.chunk_paragraph(paragraph));
     }
     return chunks;
   }
@@ -417,7 +423,7 @@ export default class MetricAnalyzer {
       return paragraph_chunks
     }
     const sentences = nlp.readDoc(paragraph.trim()).sentences().out();
-    paragraph_chunks.push(...chunk_sentences(sentences))
+    paragraph_chunks.push(...this.chunk_sentences(sentences))
     return paragraph_chunks;
   }
 
@@ -430,7 +436,7 @@ export default class MetricAnalyzer {
           chunks.push(currentChunk.trim());
           currentChunk = '';
         }
-        chunks.push(...chunk_long_sentence(sentence.trim()))
+        chunks.push(...this.chunk_long_sentence(sentence.trim()))
         continue;
       }
       if ((currentChunk + ' ' + sentence).trim().length <= 512) {
@@ -456,7 +462,7 @@ export default class MetricAnalyzer {
           chunks.push(currentChunk.trim());
           currentChunk = '';
         }
-        chunks.push(...chunk_incoherently_long_string(word));
+        chunks.push(...this.chunk_incoherently_long_string(word));
         continue;
       }
 
