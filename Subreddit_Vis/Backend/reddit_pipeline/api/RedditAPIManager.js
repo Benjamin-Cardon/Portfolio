@@ -8,14 +8,6 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-class RedditAPIError extends Error {
-  constructor(code, message, meta = {}) {
-    super(message);
-    this.name = "RedditAPIError";
-    this.code = code;      // e.g. "AUTH_FAILED", "RATE_LIMIT", "NETWORK"
-    this.meta = meta;      // optional extra info (status, url, etc.)
-  }
-}
 
 export default class RedditAPIManager {
   constructor({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep }) {
@@ -25,15 +17,12 @@ export default class RedditAPIManager {
     this.count = count;
     this.isBurstEnd = isBurstEnd;
     this.isBurstSleep = isBurstSleep;
-    this.errorState = 0
-    this.error = null;
+
+    this.posts = [];
+    this.postMap = new Map();
+    this.commentMap = new Map();
   }
 
-  static async create({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep, }) {
-    const manager = new RedditAPIManager({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep, token: null });
-    await manager.init();
-    return manager;
-  }
 
   async init() {
     this.token = this.check_auth_token_expired();
