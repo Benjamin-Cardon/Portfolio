@@ -124,7 +124,7 @@ export default class RedditAPIManager {
       this.get_request_rates()
       if (this.requests_remaining == 0) {
         if (this.isFull || this.isBurstSleep) {
-          await this.sleep(ms_remaining + 100)
+          await this.sleep(this.ms_remaining + 100)
           this.get_request_rates()
         }
         else {
@@ -240,12 +240,24 @@ export default class RedditAPIManager {
   }
 
   log_request_count() {
-    if (this.unlogged_requests > 0) {
-      let log = this.trim_request_log(readFileSync('./reddit/requestlog.txt', 'utf-8').split(','));
-      log.push(`${this.unlogged_requests}:${Date.now()}`)
-      writeFileSync('./reddit/requestlog.txt', log.join(','));
-      this.unlogged_requests = 0;
+    if (this.unlogged_requests == 0) return;
+    let rawLog = "";
+    try {
+      rawLog = readFileSync('./reddit/requestlog.txt', 'utf-8');
+    } catch (err) {
+      this.errors.push({
+        level: "warning",
+        stage: "api",
+        info: "Issue when trying to read the request log. It may be that it simply does not exist, in which case, no worries, it'll be produced by running the file.",
+        err
+      })
+      rawLog = "";
     }
+    let log = this.trim_request_log(rawLog.split(','));
+    log.push(`${this.unlogged_requests}:${Date.now()}`)
+    writeFileSync('./reddit/requestlog.txt', log.join(','));
+    this.unlogged_requests = 0;
+
   }
 
   trim_request_log(log) {
@@ -282,149 +294,169 @@ export default class RedditAPIManager {
   }
 
   async get_posts() {
-    const limit = 100;
-    let after = null;
-    const params = { limit };
-    this.get_request_rates()
+    try {
+      const limit = 100;
+      let after = null;
+      const params = { limit };
+      this.get_request_rates()
 
-    while (this.posts.length < this.count) {
-      await this.sleep_until_refresh_if_appropriate();
-      if (this.check_end()) {
-        break;
-      }
-
-      if (after) params.after = after;
-      this.increment_requests()
-
-      const response = await axios.get(`https://oauth.reddit.com/r/${this.subreddit}/new`, {
-        headers: this.headers, params
-      })
-
-      const children = response.data.data.children;
-      if (!children || children.length === 0) break;
-
-      this.posts.push(...children)
-      after = response.data.data.after;
-
-      if (!after) break;
-
-      if (this.isFull) {
-        if (this.unlogged_requests % 50 == 0) {
-          this.log_request_count();
-          this.get_request_rates();
+      while (this.posts.length < this.count) {
+        await this.sleep_until_refresh_if_appropriate();
+        if (this.check_end()) {
+          break;
         }
-        await this.sleep((this.ms_remaining / this.requests_remaining ?? 1));
+
+        if (after) params.after = after;
+        this.increment_requests()
+
+        const response = await axios.get(`https://oauth.reddit.com/r/${this.subreddit}/new`, {
+          headers: this.headers, params
+        })
+
+        const children = response.data.data.children;
+        if (!children || children.length === 0) break;
+
+        this.posts.push(...children)
+        after = response.data.data.after;
+
+        if (!after) break;
+
+        if (this.isFull) {
+          if (this.unlogged_requests % 50 == 0) {
+            this.log_request_count();
+            this.get_request_rates();
+          }
+          await this.pace_requests_if_appropriate()
+        }
       }
-    }
 
-    if (posts.length > this.count) {
-      posts.length = this.count;
+      if (this.posts.length > this.count) {
+        this.posts.length = this.count;
+      }
+      this.log_request_count()
+    } catch (err) {
+      this.errors.push({
+        level: 'fatal',
+        stage: 'Get Posts',
+        info: "Unknown Error",
+        err
+      })
+      return { ok: false, posts: this.posts.length, requests_made: this.requests_made, this.errors }
     }
-
-    this.log_request_count()
-    return {}
+    return { ok: true, posts: this.posts.length, requests_made: this.requests_made, this.errors }
   }
 
   async get_comments_for_posts() {
-    const postRequests = [];
-    const more_nodes_request_queue = [];
-    this.log_request_count()
-    this.get_request_rates();
+    try {
+      const postRequests = [];
+      const more_nodes_request_queue = [];
+      this.log_request_count()
+      this.get_request_rates();
 
-    // see if we have enough requests to get all the posts:
-    for (const post of this.posts) {
-      const postId = post.data.name;
-      this.postMap.set(postId, post);
-      await this.sleep_until_refresh_if_appropriate();
+      // see if we have enough requests to get all the posts:
+      for (const post of this.posts) {
+        const postId = post.data.name;
+        this.postMap.set(postId, post);
+        await this.sleep_until_refresh_if_appropriate();
 
-      if (check_end()) {
-        post.comments = [];
-        continue;
-      }
-
-      if ((!post.data.num_comments)) {
-        post.comments = [];
-        continue;
-      }
-
-      this.increment_requests()
-
-      postRequests.push(axios
-        .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers: this.headers })
-        .then((res) => {
-          // As soon as this one resolves, attach the comments to the post
-          const children = res.data[1].data.children;
-          post.comments = children;
-        })
-        .catch((err) => {
-          console.error(`Failed to load comments for post ${postId}`, err);
-        })
-      );
-
-      if (this.isFull && request_count % 50 === 0) {
-        this.log_request_count();
-        this.get_request_rates();
-      }
-      await pace_requests_if_appropriate()
-    }
-
-    this.log_request_count();
-    await Promise.all(postRequests);
-
-    for (const post of this.posts) {
-      this.process_comment_tree_into_map_and_queue(post, more_nodes_request_queue, post.data.name);
-    }
-
-    this.get_request_rates()
-    while (more_nodes_request_queue.length && !this.end_requests) {
-      await this.sleep_until_refresh_if_appropriate();
-
-      this.increment_requests();
-
-      const req = more_nodes_request_queue.shift();
-      const { parentNode, childrenIds } = req;
-      const url = `https://oauth.reddit.com/api/morechildren?api_type=json&raw_json=1&link_id=${req.postId}&children=${childrenIds.join(",")}`;
-      const res = await axios.get(url, { headers: this.headers });
-      const newChildren = res.data.json.data.things; // array of 't1' comments
-      for (const child of newChildren) {
-        if (child.kind == 'more') {
-          more_nodes_request_queue.push({
-            parentNode: parentNode,  // direct reference
-            postId: req.postId,
-            childrenIds: child.data.children,
-          });
-        } else {
-          this.commentMap.set(child.data.name, child)
-          this.process_comment_tree_into_map_and_queue(child, more_nodes_request_queue, req.postId)
+        if (this.check_end()) {
+          post.comments = [];
+          continue;
         }
-      }
-      newChildren.forEach((child) => {
-        if (child.kind == 'more') {
-          return;
+
+        if ((!post.data.num_comments)) {
+          post.comments = [];
+          continue;
         }
-        if (child.data.parent_id.slice(0, 2) == 't3') {
-          this.postMap.get(child.data.parent_id).comments.push(child);
-        } else if (child.data.parent_id.slice(0, 2) == 't1') {
-          const parentComment = this.commentMap.get(child.data.parent_id);
-          if (parentComment.data.replies === "") {
-            parentComment.data.replies = {
-              kind: "Listing",
-              data: { children: [child] },
-            };
-          } else if (parentComment.data.replies?.data?.children) {
-            parentComment.data.replies.data.children.push(child);
+
+        this.increment_requests()
+
+        postRequests.push(axios
+          .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers: this.headers })
+          .then((res) => {
+            // As soon as this one resolves, attach the comments to the post
+            const children = res.data[1].data.children;
+            post.comments = children;
+          })
+          .catch((err) => {
+            console.error(`Failed to load comments for post ${postId}`, err);
+          })
+        );
+
+        if (this.isFull && this.unlogged_requests % 50 === 0) {
+          this.log_request_count();
+          this.get_request_rates();
+        }
+        await this.pace_requests_if_appropriate()
+      }
+
+      this.log_request_count();
+      await Promise.all(postRequests);
+
+      for (const post of this.posts) {
+        this.process_comment_tree_into_map_and_queue(post, more_nodes_request_queue, post.data.name);
+      }
+
+      this.get_request_rates()
+      while (more_nodes_request_queue.length && !this.end_requests) {
+        await this.sleep_until_refresh_if_appropriate();
+
+        this.increment_requests();
+
+        const req = more_nodes_request_queue.shift();
+        const { parentNode, childrenIds } = req;
+        const url = `https://oauth.reddit.com/api/morechildren?api_type=json&raw_json=1&link_id=${req.postId}&children=${childrenIds.join(",")}`;
+        const res = await axios.get(url, { headers: this.headers });
+        const newChildren = res.data.json.data.things; // array of 't1' comments
+        for (const child of newChildren) {
+          if (child.kind == 'more') {
+            more_nodes_request_queue.push({
+              parentNode: parentNode,  // direct reference
+              postId: req.postId,
+              childrenIds: child.data.children,
+            });
           } else {
-            // Fallback: if replies got into some weird shape, normalize
-            parentComment.data.replies = {
-              kind: "Listing",
-              data: { children: [child] },
-            };
+            this.commentMap.set(child.data.name, child)
+            this.process_comment_tree_into_map_and_queue(child, more_nodes_request_queue, req.postId)
           }
         }
+        newChildren.forEach((child) => {
+          if (child.kind == 'more') {
+            return;
+          }
+          if (child.data.parent_id.slice(0, 2) == 't3') {
+            this.postMap.get(child.data.parent_id).comments.push(child);
+          } else if (child.data.parent_id.slice(0, 2) == 't1') {
+            const parentComment = this.commentMap.get(child.data.parent_id);
+            if (parentComment.data.replies === "") {
+              parentComment.data.replies = {
+                kind: "Listing",
+                data: { children: [child] },
+              };
+            } else if (parentComment.data.replies?.data?.children) {
+              parentComment.data.replies.data.children.push(child);
+            } else {
+              // Fallback: if replies got into some weird shape, normalize
+              parentComment.data.replies = {
+                kind: "Listing",
+                data: { children: [child] },
+              };
+            }
+          }
+        })
+        await this.pace_requests_if_appropriate();
+      }
+      this.log_request_count();
+    } catch (err) {
+      this.errors.push({
+        level: 'fatal',
+        stage: 'Get Comments',
+        info: "Unknown Error",
+        err
       })
-      await this.pace_requests_if_appropriate();
+      return { ok: false, comments: this.commentMap.size, requests_made: this.requests_made, this.errors }
     }
-    this.log_request_count();
+    return { ok: true, comments: this.commentMap.size, requests_made: this.requests_made, this.errors }
   }
 
   process_comment_tree_into_map_and_queue(rootNode, more_nodes_request_queue, postId) {
@@ -459,6 +491,7 @@ export default class RedditAPIManager {
           childrenIds: node.data.children,
         });
       } else {
+
       }
     }
   }
