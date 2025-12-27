@@ -3,7 +3,7 @@ import { multiply, transpose } from 'mathjs';
 import { nlp, its, as, sentiment, embeddings } from '../init/init.js'
 
 export default class MetricAnalyzer {
-  constructor() {
+  constructor(logger) {
     this.data = {
       comments: {},
       posts: {},
@@ -12,10 +12,16 @@ export default class MetricAnalyzer {
       embeddings: {},
       texts: {},
     }
+    this.logger = logger
   }
   async calculate_metrics(posts, postMap, commentMap) {
+    let i = 0;
     try {
       for (const post of posts) {
+        i++;
+        if (i % 50 === 0) {
+          this.logger.log('info', `Calculated Metrics for ${i} posts and associated comments.`);
+        }
         const post_metrics = await this.calculate_post_metrics(post);
         const comments_metrics = await this.calculate_comments_metrics(post.comments, post.data.name);
         this.reduce_post(post_metrics,);
@@ -28,6 +34,10 @@ export default class MetricAnalyzer {
         message: err?.message,
         stack: err?.stack,
       };
+      this.logger.log(
+        'debug',
+        `Error in calculate_metrics: ${err.stack || err}`
+      );
       return { ok: false, errors: [normalizedError], users: Object.entries(this.data.users).length, words: Object.entries(this.data.words).length }
     }
     return { ok: true, errors: [], users: Object.entries(this.data.users).length, words: Object.entries(this.data.words).length }
@@ -124,6 +134,13 @@ export default class MetricAnalyzer {
 
       const parent_post_user = users[parent_post.data.author_fullname];
       const direct_parent_user = users[direct_parent.data.author_fullname];
+      if (!parent_post_user || !direct_parent_user) {
+        this.logger.log(
+          'debug',
+          `Missing parent user while reducing comment ${comment.id}; ` +
+          `parent_post_user=${!!parent_post_user}, direct_parent_user=${!!direct_parent_user}`
+        );
+      }
       user.users_replied_to.push(direct_parent_user.author_id);
       user.users_whose_posts_were_commented_on.push(parent_post_user.author_id);
       parent_post_user.users_who_commented_on_own_post.push(user.author_id)

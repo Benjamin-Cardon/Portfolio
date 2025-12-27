@@ -10,14 +10,14 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 
 export default class RedditAPIManager {
-  constructor({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep }) {
+  constructor({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep }, logger) {
     this.subreddit = subreddit;
     this.isCount = isCount;
     this.isFull = isFull;
     this.count = count;
     this.isBurstEnd = isBurstEnd;
     this.isBurstSleep = isBurstSleep;
-
+    this.logger = logger;
     this.posts = [];
     this.postMap = new Map();
     this.commentMap = new Map();
@@ -33,19 +33,37 @@ export default class RedditAPIManager {
 
   async init() {
     this.token = this.check_auth_token_expired()
-
+    this.logger.log(
+      'debug',
+      this.token
+        ? 'Using cached auth token from token.txt'
+        : 'No valid cached token; requesting new one'
+    );
     if (!this.token) {
       try {
         const [token, expires_in] = await this.get_auth_token()
         this.token = token;
         this.save_auth_token(token, expires_in)
+        this.logger.log(
+          'debug',
+          `Fetched new auth token; expires_in=${response.data.expires_in}s`
+        );
       }
       catch (err) {
+        this.logger.log(
+          'debug',
+          `get_auth_token failed: status=${err.response?.status}, data=${JSON.stringify(err.response?.data)}`
+        );
+        const normalizedError = {
+          name: err?.name,
+          message: err?.message,
+          stack: err?.stack,
+        };
         this.errors.push({
           level: 'fatal',
           stage: 'auth',
           info: 'Failed to authorize with reddit client',
-          err
+          normalizedError
         })
         return { ok: false, requests_made: this.requests_made, errors: this.errors }
       }
@@ -54,6 +72,10 @@ export default class RedditAPIManager {
     if (!isValidSubreddit) {
       return { ok: false, requests_made: this.requests_made, errors: this.errors }
     }
+    this.logger.log(
+      'debug',
+      `check_subreddit_public_sfw_exists returned ok=${isValidSubreddit}`
+    );
     return { ok: true, requests_made: this.requests_made, errors: this.errors };
   }
 
@@ -85,6 +107,7 @@ export default class RedditAPIManager {
           stage: 'API Init',
           info: 'No Auth token file to be read.If this is your first run, not an issue.'
         })
+        this.logger.log('debug', 'No token.txt found; treating as no cached token');
         return "";
       }
 
@@ -98,22 +121,30 @@ export default class RedditAPIManager {
           stage: 'API Init',
           info: 'malformed or corrupted cached token file. Attempting to get new token.'
         })
+        this.logger.log('debug', `Malformed token file: contents="${contents}"`);
         return "";
       }
 
       const now = Math.floor(Date.now() / 1000);
 
       if (expiration < now - 60) {
+        this.logger.log('debug', `Cached token expired at ${expiration}, now=${now}`);
         return "";
       }
 
+      this.logger.log('debug', `Cached token valid until ${expiration}, using it`);
       return token;
     } catch (err) {
+      const normalizedError = {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      };
       this.errors.push({
         level: 'warning',
         stage: 'API Init',
         info: 'Unknown error while fetching cached auth token. Attempting to get new token',
-        err
+        normalizedError
       })
       return "";
     }
@@ -217,11 +248,16 @@ export default class RedditAPIManager {
     try {
       rawLog = readFileSync('./api/requestlog.txt', 'utf-8');
     } catch (err) {
+      const normalizedError = {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      };
       this.errors.push({
         level: "warning",
         stage: "api",
         info: "Issue when trying to read the request log. It may be that it simply does not exist, in which case, no worries, it'll be produced by running the file.",
-        err
+        normalizedError
       })
       rawLog = "";
     }
@@ -237,6 +273,12 @@ export default class RedditAPIManager {
     if (request_summary.requests_used === 0) {
       this.ms_remaining = 1;
     }
+    this.logger.log(
+      'debug',
+      `request rates: used=${request_summary.requests_used}, ` +
+      `remaining=${this.requests_remaining}, ` +
+      `ms_remaining=${this.ms_remaining}`
+    );
   }
 
   log_request_count() {
@@ -245,19 +287,27 @@ export default class RedditAPIManager {
     try {
       rawLog = readFileSync('./api/requestlog.txt', 'utf-8');
     } catch (err) {
+      const normalizedError = {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      };
       this.errors.push({
         level: "warning",
         stage: "api",
         info: "Issue when trying to read the request log. It may be that it simply does not exist, in which case, no worries, it'll be produced by running the file.",
-        err
+        normalizedError
       })
       rawLog = "";
     }
     let log = this.trim_request_log(rawLog.split(','));
     log.push(`${this.unlogged_requests}:${Date.now()}`)
     writeFileSync('./api/requestlog.txt', log.join(','));
+    this.logger.log(
+      'debug',
+      `Logged ${this.unlogged_requests} requests to requestlog.txt`
+    );
     this.unlogged_requests = 0;
-
   }
 
   trim_request_log(log) {
@@ -266,6 +316,12 @@ export default class RedditAPIManager {
 
   async sleep_until_refresh_if_appropriate() {
     if (this.requests_remaining <= this.unlogged_requests && (this.isFull || (this.isCount && this.isBurstSleep))) {
+      this.logger.log('info', `Ran out of requests. Rate limiting for ${(this.ms_remaining + 100) / 60000} minutes until more requests are avaiable.`)
+      this.logger.log(
+        'debug',
+        `Rate limit hit; sleeping ${this.ms_remaining + 100}ms ` +
+        `(requests_remaining=${this.requests_remaining}, unlogged=${this.unlogged_requests})`
+      );
       this.log_request_count()
       await this.sleep(this.ms_remaining + 100)
       this.get_request_rates()
@@ -287,6 +343,12 @@ export default class RedditAPIManager {
   check_end() {
     if ((this.requests_remaining <= this.unlogged_requests && this.isCount && this.isBurstEnd) || this.end_requests) {
       this.log_request_count()
+      if (this.end_requests === false) {
+        this.logger.log(
+          'debug',
+          `Ending requests early: requests_remaining=${this.requests_remaining}, unlogged=${this.unlogged_requests}, end_requests=${this.end_requests}`
+        );
+      }
       this.end_requests = true;
       return true;
     }
@@ -295,6 +357,10 @@ export default class RedditAPIManager {
 
   async get_posts() {
     try {
+      this.logger.log(
+        'debug',
+        `get_posts: target_count=${this.count}, mode={isFull:${this.isFull}, isCount:${this.isCount}, isBurstEnd:${this.isBurstEnd}, isBurstSleep:${this.isBurstSleep}}`
+      );
       const limit = 100;
       let after = null;
       const params = { limit };
@@ -308,7 +374,10 @@ export default class RedditAPIManager {
 
         if (after) params.after = after;
         this.increment_requests()
-
+        this.logger.log(
+          'debug',
+          `get_posts loop: current_posts=${this.posts.length}, after=${after}, requests_remaining=${this.requests_remaining}, unlogged=${this.unlogged_requests}`
+        );
         const response = await axios.get(`https://oauth.reddit.com/r/${this.subreddit}/new`, {
           headers: this.headers, params
         })
@@ -319,7 +388,15 @@ export default class RedditAPIManager {
         this.posts.push(...children)
         after = response.data.data.after;
 
-        if (!after) break;
+        this.logger.log(
+          'debug',
+          `Fetched posts page: children=${children.length}, total_posts=${this.posts.length}, after=${after}`
+        );
+
+        if (!after) {
+          this.logger.log('debug', 'Breaking out of get_posts: no more pages / reached count');
+          break;
+        }
 
         if (this.isFull) {
           if (this.unlogged_requests % 50 == 0) {
@@ -335,11 +412,16 @@ export default class RedditAPIManager {
       }
       this.log_request_count()
     } catch (err) {
+      const normalizedError = {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      };
       this.errors.push({
         level: 'fatal',
         stage: 'Get Posts',
         info: "Unknown Error",
-        err
+        normalizedError
       })
       return { ok: false, posts: this.posts.length, requests_made: this.requests_made, errors: this.errors }
     }
@@ -348,6 +430,10 @@ export default class RedditAPIManager {
 
   async get_comments_for_posts() {
     try {
+      this.logger.log(
+        'debug',
+        `get_comments_for_posts: posts=${this.posts.length}`
+      );
       const postRequests = [];
       const more_nodes_request_queue = [];
       this.log_request_count()
@@ -370,7 +456,10 @@ export default class RedditAPIManager {
         }
 
         this.increment_requests()
-
+        this.logger.log(
+          'debug',
+          `Fetching comments for post=${postId}, num_comments=${post.data.num_comments}`
+        );
         postRequests.push(axios
           .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers: this.headers })
           .then((res) => {
@@ -383,6 +472,10 @@ export default class RedditAPIManager {
           })
         );
 
+        if (postRequests.length % 100 == 0) {
+          this.logger.log(`info`, `Made ${postRequests.length} requests for comments on posts.`);
+        }
+
         if (this.isFull && this.unlogged_requests % 50 === 0) {
           this.log_request_count();
           this.get_request_rates();
@@ -391,6 +484,7 @@ export default class RedditAPIManager {
       }
 
       this.log_request_count();
+      this.logger.log('info', `Made total of ${postRequests.length} requests for comments on posts.`)
       await Promise.all(postRequests);
 
       for (const post of this.posts) {
@@ -402,7 +496,11 @@ export default class RedditAPIManager {
         await this.sleep_until_refresh_if_appropriate();
 
         this.increment_requests();
-
+        this.logger.log(
+          'debug',
+          `more_children loop: queue_len=${more_nodes_request_queue.length}, ` +
+          `requests_remaining=${this.requests_remaining}, unlogged=${this.unlogged_requests}`
+        );
         const req = more_nodes_request_queue.shift();
         const { parentNode, childrenIds } = req;
         const url = `https://oauth.reddit.com/api/morechildren?api_type=json&raw_json=1&link_id=${req.postId}&children=${childrenIds.join(",")}`;
@@ -448,11 +546,16 @@ export default class RedditAPIManager {
       }
       this.log_request_count();
     } catch (err) {
+      const normalizedError = {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack,
+      };
       this.errors.push({
         level: 'fatal',
         stage: 'Get Comments',
         info: "Unknown Error",
-        err
+        normalizedError
       })
       return { ok: false, comments: this.commentMap.size, requests_made: this.requests_made, errors: this.errors }
     }
@@ -490,10 +593,12 @@ export default class RedditAPIManager {
           postId: postId,     // passed in
           childrenIds: node.data.children,
         });
-      } else {
-
       }
     }
+    this.logger.log(
+      'debug',
+      `Queued ${more_nodes_request_queue.length} 'more' nodes after initial comments fetch`
+    );
   }
 }
 
