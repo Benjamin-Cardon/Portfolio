@@ -2,12 +2,13 @@ import MetricAnalyzer from './MetricAnalyzer.js'
 import RedditAPIManager from '../api/RedditAPIManager.js'
 import path from 'path'
 export default class Runner {
-  constructor(Logger, Writer, batch_config) {
+  constructor(Logger, Writer, TokenManager, batch_config) {
     this.logger = Logger;
     this.writer = Writer;
     this.taskSummaries = [];
     this.out_dir = batch_config.out_dir;
     this.isFileMode = batch_config.isFileMode;
+    this.tokenManager = TokenManager
   }
   async run(Task) {
 
@@ -64,38 +65,34 @@ export default class Runner {
     }
     this.logger.log('info', `Beginning Task for Subreddit ${Task.args.subreddit}.`)
 
-    const api = new RedditAPIManager(Task.args, this.logger);
+    const api = new RedditAPIManager(Task.args, this.logger, this.tokenManager);
 
-    this.logger.log('info', `Beginning API Initialization for Subreddit ${Task.args.subreddit}.`)
+    this.logger.log('info', `Validating Subreddit for ${Task.args.subreddit}.`)
 
-    const initResult = await api.init();
+    const checkResult = await api.check_subreddit_public_sfw_exists();
     //check init result.\
-    this.logger.log(
-      'debug',
-      `Init result for ${Task.args.subreddit}: ` +
-      JSON.stringify(initResult)
-    );
-    taskSummary.requests_made = initResult.requests_made;
 
-    if (!initResult.ok) {
-      this.logger.log('info', `Error at API Initialization stage.`)
+    taskSummary.requests_made = checkResult.requests_made;
+
+    if (!checkResult.ok) {
+      this.logger.log('info', `Error at Subreddit Validation stage.`)
       if (!this.isFileMode) {
         {
-          this.logger.log('quiet', "Error at API Initialization stage.")
+          this.logger.log('quiet', "Error at Subreddit Validation stage.")
         }
       }
-      taskSummary.error_stage = "API_Initalization"
+      taskSummary.error_stage = "Subreddit Validation"
       taskSummary.timeEnded = new Date().toISOString()
       this.taskSummaries.push(taskSummary);
       this.writer.write({
         taskSucceeded: false,
         data: "__null__",
-        errors: initResult.errors,
+        errors: checkResult.errors,
         Task,
       })
       return;
     }
-    this.logger.log('info', `Initialization of Subreddit: ${Task.args.subreddit} successful.`)
+    this.logger.log('info', `Subreddit Validation of Subreddit: ${Task.args.subreddit} successful.`)
     this.logger.log('info', `Getting posts for Subreddit ${Task.args.subreddit}.`)
 
     const postResult = await api.get_posts();
@@ -256,7 +253,7 @@ export default class Runner {
       this.logger.log('debug', `failed Tasks:`)
       for (const failure_string of failure_strings) {
         this.logger.log('info', failure_string);
-        this.logger.log('info', failure_string);
+        this.logger.log('debug', failure_string);
       }
       if (failure_strings.length === 0) {
         this.logger.log('info', "No Failed Tasks")

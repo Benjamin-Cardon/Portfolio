@@ -1,16 +1,8 @@
 import axios from "axios";
-import dotenv from "dotenv";
 import path from "path";
-import { fileURLToPath } from "url";
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.join(__dirname, ".env") });
-
-
 export default class RedditAPIManager {
-  constructor({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep }, logger) {
+  constructor({ subreddit, isCount, isFull, count, isBurstEnd, isBurstSleep }, logger, TokenManager) {
     this.subreddit = subreddit;
     this.isCount = isCount;
     this.isFull = isFull;
@@ -27,128 +19,10 @@ export default class RedditAPIManager {
     this.ms_remaining = 0;
     this.window_ends_at = 0;
     this.end_requests = false;
-    this.token = "";
     this.errors = []
+    this.tokenManager = TokenManager;
   }
 
-  async init() {
-    this.token = this.check_auth_token_expired()
-    this.logger.log(
-      'debug',
-      this.token
-        ? 'Using cached auth token from token.txt'
-        : 'No valid cached token; requesting new one'
-    );
-    if (!this.token) {
-      try {
-        const [token, expires_in] = await this.get_auth_token()
-        this.token = token;
-        this.save_auth_token(token, expires_in)
-        this.logger.log(
-          'debug',
-          `Fetched new auth token; expires_in=${response.data.expires_in}s`
-        );
-      }
-      catch (err) {
-        this.logger.log(
-          'debug',
-          `get_auth_token failed: status=${err.response?.status}, data=${JSON.stringify(err.response?.data)}`
-        );
-        const normalizedError = {
-          name: err?.name,
-          message: err?.message,
-          stack: err?.stack,
-        };
-        this.errors.push({
-          level: 'fatal',
-          stage: 'auth',
-          info: 'Failed to authorize with reddit client',
-          normalizedError
-        })
-        return { ok: false, requests_made: this.requests_made, errors: this.errors }
-      }
-    }
-    const isValidSubreddit = await this.check_subreddit_public_sfw_exists()
-    if (!isValidSubreddit) {
-      return { ok: false, requests_made: this.requests_made, errors: this.errors }
-    }
-    this.logger.log(
-      'debug',
-      `check_subreddit_public_sfw_exists returned ok=${isValidSubreddit}`
-    );
-    return { ok: true, requests_made: this.requests_made, errors: this.errors };
-  }
-
-  save_auth_token(token, expires_in) {
-    const expiration_date = Math.floor(Date.now() / 1000) + Number(expires_in);
-    writeFileSync('./api/token.txt', expiration_date + ":::" + token);
-  }
-
-  async get_auth_token() {
-    const response = await axios.post("https://www.reddit.com/api/v1/access_token", `grant_type=password&username=${process.env.REDDIT_USERNAME}&password=${process.env.REDDIT_PASSWORD}`, {
-      auth: {
-        username: process.env.REDDIT_CLIENTID,
-        password: process.env.REDDIT_SECRET
-      },
-      headers: {
-        "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
-        "Content-Type": "application/x-www-form-urlencoded"
-      }
-    });
-    return [response.data.access_token, response.data.expires_in]
-  }
-
-
-  check_auth_token_expired() {
-    try {
-      if (!existsSync("./api/token.txt")) {
-        this.errors.push({
-          level: 'warning',
-          stage: 'API Init',
-          info: 'No Auth token file to be read.If this is your first run, not an issue.'
-        })
-        this.logger.log('debug', 'No token.txt found; treating as no cached token');
-        return "";
-      }
-
-      const contents = readFileSync("./api/token.txt", "utf-8");
-      const [expStr, token] = contents.split(":::");
-      const expiration = Number(expStr);
-
-      if (!token || Number.isNaN(expiration)) {
-        this.errors.push({
-          level: 'warning',
-          stage: 'API Init',
-          info: 'malformed or corrupted cached token file. Attempting to get new token.'
-        })
-        this.logger.log('debug', `Malformed token file: contents="${contents}"`);
-        return "";
-      }
-
-      const now = Math.floor(Date.now() / 1000);
-
-      if (expiration < now - 60) {
-        this.logger.log('debug', `Cached token expired at ${expiration}, now=${now}`);
-        return "";
-      }
-
-      this.logger.log('debug', `Cached token valid until ${expiration}, using it`);
-      return token;
-    } catch (err) {
-      const normalizedError = {
-        name: err?.name,
-        message: err?.message,
-        stack: err?.stack,
-      };
-      this.errors.push({
-        level: 'warning',
-        stage: 'API Init',
-        info: 'Unknown error while fetching cached auth token. Attempting to get new token',
-        normalizedError
-      })
-      return "";
-    }
-  }
 
   async check_subreddit_public_sfw_exists() {
     try {
@@ -165,21 +39,14 @@ export default class RedditAPIManager {
             info: "Attempted to run process in end mode with no requests.",
             err: null
           })
-          return false
+          return { ok: false, requests_made: this.requests_made, errors: this.errors };
         }
       }
-
-      const headers = {
-        "User-Agent": "web:social-graph-analysis-visualization:v1.0.0 (by /u/AppropriateTap826)",
-        Authorization: `Bearer ${this.token}`,
-      };
-      this.headers = headers
-
       this.increment_requests()
       this.log_request_count()
 
       const response = await axios.get(`https://oauth.reddit.com/r/${this.subreddit}/about`, {
-        headers,
+        headers: await this.tokenManager.get_headers(),
       })
 
       if (response.data.data.over18) {
@@ -189,10 +56,10 @@ export default class RedditAPIManager {
           info: "This subreddit is marked NSFW. I suppose you can remove the code to block this if you'd like, but I wrote this assuming the tool would be used in a work context",
           err: null
         })
-        return false
+        return { ok: false, requests_made: this.requests_made, errors: this.errors }
       }
 
-      return true;
+      return { ok: true, requests_made: this.requests_made, errors: this.errors };
     } catch (err) {
       const status = err.response?.status;
       if (status == 400) {
@@ -202,7 +69,7 @@ export default class RedditAPIManager {
           info: "Axios Error",
           err
         })
-        return false;
+        return { ok: false, requests_made: this.requests_made, errors: this.errors };
       } else if (status == 401) {
         this.errors.push({
           level: "fatal",
@@ -210,7 +77,7 @@ export default class RedditAPIManager {
           info: "Authorization Error",
           err
         })
-        return false;
+        return { ok: false, requests_made: this.requests_made, errors: this.errors };
       } else if (status == 403) {
         this.errors.push({
           level: "fatal",
@@ -218,7 +85,7 @@ export default class RedditAPIManager {
           info: "Private Subreddit",
           err
         })
-        return false;
+        return { ok: false, requests_made: this.requests_made, errors: this.errors };
       } else if (status == 404) {
         this.errors.push({
           level: "fatal",
@@ -226,7 +93,7 @@ export default class RedditAPIManager {
           info: "Subreddit Does Not Exist",
           err
         })
-        return false;
+        return { ok: false, requests_made: this.requests_made, errors: this.errors };
       } else {
         this.errors.push({
           level: "fatal",
@@ -234,7 +101,7 @@ export default class RedditAPIManager {
           info: "General API Init failure",
           err
         })
-        return false;
+        return { ok: false, requests_made: this.requests_made, errors: this.errors };
       }
     }
   }
@@ -267,7 +134,7 @@ export default class RedditAPIManager {
       accumulator.earliest_request = Math.min(Number(time), accumulator.earliest_request);
       return accumulator;
     }, { requests_used: 0, earliest_request: Date.now() });
-    this.requests_remaining = 1000 - request_summary.requests_used;
+    this.requests_remaining = 999 - request_summary.requests_used;
     this.window_ends_at = request_summary.earliest_request + 600000;
     this.ms_remaining = request_summary.earliest_request + 600000 - Date.now();
     if (request_summary.requests_used === 0) {
@@ -379,7 +246,7 @@ export default class RedditAPIManager {
           `get_posts loop: current_posts=${this.posts.length}, after=${after}, requests_remaining=${this.requests_remaining}, unlogged=${this.unlogged_requests}`
         );
         const response = await axios.get(`https://oauth.reddit.com/r/${this.subreddit}/new`, {
-          headers: this.headers, params
+          headers: await this.tokenManager.get_headers(), params
         })
 
         const children = response.data.data.children;
@@ -461,7 +328,7 @@ export default class RedditAPIManager {
           `Fetching comments for post=${postId}, num_comments=${post.data.num_comments}`
         );
         postRequests.push(axios
-          .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers: this.headers })
+          .get(`https://oauth.reddit.com/comments/${postId.slice(3)}?depth=10&limit=500`, { headers: await this.tokenManager.get_headers() })
           .then((res) => {
             // As soon as this one resolves, attach the comments to the post
             const children = res.data[1].data.children;
@@ -494,7 +361,11 @@ export default class RedditAPIManager {
       this.get_request_rates()
       while (more_nodes_request_queue.length && !this.end_requests) {
         await this.sleep_until_refresh_if_appropriate();
-
+        // if (this.check_end()) {
+        //   break;
+        // }
+        // We need to see if this will break on calculate- are the more nodes already stored a place they'll be propogated to?
+        // This is probably a case we've not dealt with yet.
         this.increment_requests();
         this.logger.log(
           'debug',
@@ -504,7 +375,7 @@ export default class RedditAPIManager {
         const req = more_nodes_request_queue.shift();
         const { parentNode, childrenIds } = req;
         const url = `https://oauth.reddit.com/api/morechildren?api_type=json&raw_json=1&link_id=${req.postId}&children=${childrenIds.join(",")}`;
-        const res = await axios.get(url, { headers: this.headers });
+        const res = await axios.get(url, { headers: await this.tokenManager.get_headers() });
         const newChildren = res.data.json.data.things; // array of 't1' comments
         for (const child of newChildren) {
           if (child.kind == 'more') {

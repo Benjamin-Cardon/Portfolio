@@ -4,7 +4,7 @@ import Logger from './io/Logger.js'
 import Writer from './io/Writer.js'
 import process from 'node:process'
 import Runner from './analysis/Runner.js'
-
+import TokenManager from './api/TokenManager.js'
 
 async function main() {
   const parser = new Parser()
@@ -14,8 +14,10 @@ async function main() {
   const logger = new Logger(batch_config)
   logger.log(`debug`, `Raw argv: ${JSON.stringify(process.argv.slice(2))}`)
   logger.log('debug', `Batch config: ${JSON.stringify(batch_config)}; tasks: ${tasks.length}`);
+  const tokenManager = new TokenManager(logger);
+  await tokenManager.init();
   const writer = new Writer(logger, batch_config)
-  const runner = new Runner(logger, writer, batch_config)
+  const runner = new Runner(logger, writer, tokenManager, batch_config)
   let i = 0;
   for (const task of tasks) {
     i++;
