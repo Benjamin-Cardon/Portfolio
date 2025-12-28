@@ -69,7 +69,7 @@ export default class Runner {
 
     this.logger.log('info', `Validating Subreddit for ${Task.args.subreddit}.`)
 
-    const checkResult = await api.check_subreddit_public_sfw_exists();
+    const checkResult = await api.C();
     //check init result.\
 
     taskSummary.requests_made = checkResult.requests_made;

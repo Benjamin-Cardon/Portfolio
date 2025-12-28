@@ -1,0 +1,2729 @@
+{
+  "posts": {
+    "t3_1pxf12w": {
+      "flags": {
+        "isDeletedAuthor": false,
+        "isAutoModAuthor": false,
+        "isLikelyBot": false,
+        "isNotValidText": false,
+        "isRepliedTo": true
+      },
+      "num_comments": 2,
+      "total_direct_replies": 2,
+      "total_upvotes": 0,
+      "total_downvotes": 0,
+      "author": "shimell",
+      "author_id": "t2_e88hy7aq",
+      "id": "t3_1pxf12w",
+      "frequency_table": [
+        [
+          "job",
+          4
+        ],
+        [
+          "work",
+          2
+        ],
+        [
+          "currently",
+          1
+        ],
+        [
+          "datum",
+          1
+        ],
+        [
+          "dbt",
+          1
+        ],
+        [
+          "end",
+          1
+        ],
+        [
+          "engineer",
+          1
+        ],
+        [
+          "etl",
+          1
+        ],
+        [
+          "europe",
+          1
+        ],
+        [
+          "get",
+          1
+        ],
+        [
+          "look",
+          1
+        ],
+        [
+          "oracle",
+          1
+        ],
+        [
+          "org",
+          1
+        ],
+        [
+          "personal",
+          1
+        ],
+        [
+          "quit",
+          1
+        ],
+        [
+          "reason",
+          1
+        ],
+        [
+          "role",
+          1
+        ],
+        [
+          "sas",
+          1
+        ],
+        [
+          "shortlist",
+          1
+        ],
+        [
+          "snowflake",
+          1
+        ],
+        [
+          "transition",
+          1
+        ],
+        [
+          "use",
+          1
+        ],
+        [
+          "valid",
+          1
+        ],
+        [
+          "visa",
+          1
+        ],
+        [
+          "want",
+          1
+        ],
+        [
+          "warehouse",
+          1
+        ]
+      ],
+      "sentiment": {
+        "label": "NEGATIVE",
+        "score": 0.5370282530784607
+      }
+    }
+  },
+  "comments": {
+    "t1_nwajuaa": {
+      "flags": {
+        "isEmptyText": false,
+        "isDeletedText": false,
+        "isRemovedText": false,
+        "isDeletedAuthor": false,
+        "isAutoModAuthor": true,
+        "isLikelyBot": true,
+        "isRepliedTo": false,
+        "isNotValidText": false
+      },
+      "id": "t1_nwajuaa",
+      "post_id": "t3_1pxf12w",
+      "author": "AutoModerator",
+      "author_id": "t2_6l4z3",
+      "replied_to": "t3_1pxf12w",
+      "direct_reply_count": 0,
+      "score": 1,
+      "upvotes": 1,
+      "estimated_downvotes": 0,
+      "rough_fuzzed_controversy": 0,
+      "sentiment": {
+        "label": "NEGATIVE",
+        "score": 0.8839836120605469
+      },
+      "frequency_table": [
+        [
+          "action",
+          1
+        ],
+        [
+          "automatically",
+          1
+        ],
+        [
+          "bot",
+          1
+        ],
+        [
+          "community",
+          1
+        ],
+        [
+          "compose",
+          1
+        ],
+        [
+          "concern",
+          1
+        ],
+        [
+          "contact",
+          1
+        ],
+        [
+          "data",
+          1
+        ],
+        [
+          "dataengineering",
+          1
+        ],
+        [
+          "engineering",
+          1
+        ],
+        [
+          "guide",
+          1
+        ],
+        [
+          "interest",
+          1
+        ],
+        [
+          "message",
+          1
+        ],
+        [
+          "moderator",
+          1
+        ],
+        [
+          "perform",
+          1
+        ],
+        [
+          "question",
+          1
+        ],
+        [
+          "r",
+          1
+        ],
+        [
+          "read",
+          1
+        ],
+        [
+          "subreddit",
+          1
+        ],
+        [
+          "transition",
+          1
+        ]
+      ]
+    },
+    "t1_nwb3929": {
+      "flags": {
+        "isEmptyText": false,
+        "isDeletedText": false,
+        "isRemovedText": false,
+        "isDeletedAuthor": false,
+        "isAutoModAuthor": false,
+        "isLikelyBot": false,
+        "isRepliedTo": false,
+        "isNotValidText": false
+      },
+      "id": "t1_nwb3929",
+      "post_id": "t3_1pxf12w",
+      "author": "jappy2002",
+      "author_id": "t2_owktsb8lm",
+      "replied_to": "t3_1pxf12w",
+      "direct_reply_count": 0,
+      "score": 1,
+      "upvotes": 1,
+      "estimated_downvotes": 0,
+      "rough_fuzzed_controversy": 0,
+      "sentiment": {
+        "label": "NEGATIVE",
+        "score": 0.5888368487358093
+      },
+      "frequency_table": [
+        [
+          "u",
+          2
+        ],
+        [
+          "year",
+          2
+        ],
+        [
+          "administration",
+          1
+        ],
+        [
+          "datum",
+          1
+        ],
+        [
+          "engineer",
+          1
+        ],
+        [
+          "hope",
+          1
+        ],
+        [
+          "job",
+          1
+        ],
+        [
+          "know",
+          1
+        ],
+        [
+          "land",
+          1
+        ],
+        [
+          "sap",
+          1
+        ],
+        [
+          "switch",
+          1
+        ],
+        [
+          "take",
+          1
+        ],
+        [
+          "try",
+          1
+        ]
+      ]
+    }
+  },
+  "words": {
+    "job": {
+      "unique_texts": 2,
+      "frequency": 5,
+      "negative_sentiment_freq": 5,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq",
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t3_1pxf12w",
+        "t1_nwb3929"
+      ]
+    },
+    "work": {
+      "unique_texts": 1,
+      "frequency": 2,
+      "negative_sentiment_freq": 2,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "currently": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "datum": {
+      "unique_texts": 2,
+      "frequency": 2,
+      "negative_sentiment_freq": 2,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq",
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t3_1pxf12w",
+        "t1_nwb3929"
+      ]
+    },
+    "dbt": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "end": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "engineer": {
+      "unique_texts": 2,
+      "frequency": 2,
+      "negative_sentiment_freq": 2,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq",
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t3_1pxf12w",
+        "t1_nwb3929"
+      ]
+    },
+    "etl": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "europe": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "get": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "look": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "oracle": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "org": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "personal": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "quit": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "reason": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "role": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "sas": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "shortlist": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "snowflake": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "transition": {
+      "unique_texts": 2,
+      "frequency": 2,
+      "negative_sentiment_freq": 2,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq",
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t3_1pxf12w",
+        "t1_nwajuaa"
+      ]
+    },
+    "use": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "valid": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "visa": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "want": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "warehouse": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_e88hy7aq"
+      ],
+      "texts": [
+        "t3_1pxf12w"
+      ]
+    },
+    "action": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "automatically": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "bot": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "community": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "compose": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "concern": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "contact": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "data": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "dataengineering": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "engineering": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "guide": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "interest": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "message": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "moderator": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "perform": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "question": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "r": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "read": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "subreddit": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_6l4z3"
+      ],
+      "texts": [
+        "t1_nwajuaa"
+      ]
+    },
+    "u": {
+      "unique_texts": 1,
+      "frequency": 2,
+      "negative_sentiment_freq": 2,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "year": {
+      "unique_texts": 1,
+      "frequency": 2,
+      "negative_sentiment_freq": 2,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "administration": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "hope": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "know": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "land": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "sap": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "switch": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "take": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    },
+    "try": {
+      "unique_texts": 1,
+      "frequency": 1,
+      "negative_sentiment_freq": 1,
+      "positive_sentiment_freq": 0,
+      "neutral_sentiment_freq": 0,
+      "users": [
+        "t2_owktsb8lm"
+      ],
+      "texts": [
+        "t1_nwb3929"
+      ]
+    }
+  },
+  "users": {
+    "t2_e88hy7aq": {
+      "post_count": 1,
+      "author": "shimell",
+      "author_id": "t2_e88hy7aq",
+      "total_upvotes": 0,
+      "estimated_downvotes": 0,
+      "text_ids": [
+        "t3_1pxf12w"
+      ],
+      "users_replied_to": [],
+      "users_who_commented_on_own_post": [
+        "t2_6l4z3",
+        "t2_owktsb8lm"
+      ],
+      "users_whose_posts_were_commented_on": [],
+      "users_who_replied_to": [
+        "t2_6l4z3",
+        "t2_owktsb8lm"
+      ],
+      "words": {
+        "job": {
+          "unique_texts": 1,
+          "frequency": 4,
+          "negative_sentiment_freq": 4,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "work": {
+          "unique_texts": 1,
+          "frequency": 2,
+          "negative_sentiment_freq": 2,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "currently": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "datum": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "dbt": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "end": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "engineer": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "etl": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "europe": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "get": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "look": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "oracle": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "org": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "personal": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "quit": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "reason": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "role": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "sas": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "shortlist": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "snowflake": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "transition": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "use": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "valid": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "visa": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "want": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "warehouse": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        }
+      },
+      "reply_count": 0,
+      "total_comments_on_posts": 2,
+      "total_direct_replies": 0,
+      "negative_sentiment_texts": 1,
+      "positive_sentiment_texts": 0,
+      "neutral_sentiment_texts": 0,
+      "positive_replies": 0,
+      "neutral_replies": 0,
+      "negative_replies": 2,
+      "positive_comments": 0,
+      "negative_comments": 2,
+      "neutral_comments": 0,
+      "is_likely_bot": false,
+      "only_one_text": true
+    },
+    "t2_6l4z3": {
+      "post_count": 0,
+      "author": "AutoModerator",
+      "author_id": "t2_6l4z3",
+      "total_upvotes": 1,
+      "estimated_downvotes": 0,
+      "text_ids": [
+        "t1_nwajuaa"
+      ],
+      "users_replied_to": [
+        "t2_e88hy7aq"
+      ],
+      "users_who_commented_on_own_post": [],
+      "users_whose_posts_were_commented_on": [
+        "t2_e88hy7aq"
+      ],
+      "users_who_replied_to": [],
+      "words": {
+        "action": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "automatically": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "bot": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "community": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "compose": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "concern": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "contact": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "data": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "dataengineering": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "engineering": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "guide": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "interest": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "message": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "moderator": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "perform": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "question": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "r": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "read": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "subreddit": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "transition": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        }
+      },
+      "reply_count": 1,
+      "total_comments_on_posts": 0,
+      "total_direct_replies": 0,
+      "negative_sentiment_texts": 1,
+      "positive_sentiment_texts": 0,
+      "neutral_sentiment_texts": 0,
+      "negative_replies": 0,
+      "positive_replies": 0,
+      "neutral_replies": 0,
+      "positive_comments": 0,
+      "negative_comments": 0,
+      "neutral_comments": 0,
+      "is_likely_bot": true,
+      "only_one_text": true
+    },
+    "t2_owktsb8lm": {
+      "post_count": 0,
+      "author": "jappy2002",
+      "author_id": "t2_owktsb8lm",
+      "total_upvotes": 1,
+      "estimated_downvotes": 0,
+      "text_ids": [
+        "t1_nwb3929"
+      ],
+      "users_replied_to": [
+        "t2_e88hy7aq"
+      ],
+      "users_who_commented_on_own_post": [],
+      "users_whose_posts_were_commented_on": [
+        "t2_e88hy7aq"
+      ],
+      "users_who_replied_to": [],
+      "words": {
+        "u": {
+          "unique_texts": 1,
+          "frequency": 2,
+          "negative_sentiment_freq": 2,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "year": {
+          "unique_texts": 1,
+          "frequency": 2,
+          "negative_sentiment_freq": 2,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "administration": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "datum": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "engineer": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "hope": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "job": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "know": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "land": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "sap": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "switch": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "take": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        },
+        "try": {
+          "unique_texts": 1,
+          "frequency": 1,
+          "negative_sentiment_freq": 1,
+          "positive_sentiment_freq": 0,
+          "neutral_sentiment_freq": 0
+        }
+      },
+      "reply_count": 1,
+      "total_comments_on_posts": 0,
+      "total_direct_replies": 0,
+      "negative_sentiment_texts": 1,
+      "positive_sentiment_texts": 0,
+      "neutral_sentiment_texts": 0,
+      "negative_replies": 0,
+      "positive_replies": 0,
+      "neutral_replies": 0,
+      "positive_comments": 0,
+      "negative_comments": 0,
+      "neutral_comments": 0,
+      "is_likely_bot": false,
+      "only_one_text": true
+    }
+  },
+  "embeddings": {
+    "t3_1pxf12w": [
+      -0.05944216623902321,
+      -0.1207917109131813,
+      -0.009976783767342567,
+      0.02978198230266571,
+      0.02510112151503563,
+      -0.006437236443161964,
+      0.014063953422009945,
+      0.015283719636499882,
+      -0.031428802758455276,
+      -0.055346012115478516,
+      -0.08625707775354385,
+      -0.05200649052858353,
+      0.034177135676145554,
+      0.02007812261581421,
+      -0.00146674073766917,
+      -0.012269063852727413,
+      -0.03012818656861782,
+      -0.04380469769239426,
+      0.050046250224113464,
+      -0.11104810982942581,
+      -0.04656584560871124,
+      -0.0214887335896492,
+      -0.03450561314821243,
+      -0.08637060225009918,
+      0.007843220606446266,
+      0.015367862768471241,
+      0.04321273788809776,
+      -0.05929131805896759,
+      -0.037805523723363876,
+      0.009750793687999249,
+      -0.017179051414132118,
+      -0.03805769607424736,
+      -0.10371451824903488,
+      0.08648409694433212,
+      0.024028915911912918,
+      -0.037394266575574875,
+      0.016011469066143036,
+      -0.06653148680925369,
+      -0.028707263991236687,
+      -0.020087242126464844,
+      0.07104552537202835,
+      -0.056513238698244095,
+      -0.12751594185829163,
+      -0.05228118225932121,
+      0.03265498951077461,
+      -0.05218036472797394,
+      0.0006813000654801726,
+      -0.028426721692085266,
+      -0.04937770590186119,
+      0.020115172490477562,
+      0.003907558508217335,
+      -0.04320770874619484,
+      0.10039088875055313,
+      0.01742289587855339,
+      0.00910034216940403,
+      -0.005997687112540007,
+      0.023597251623868942,
+      0.09072012454271317,
+      -0.007370778825134039,
+      -0.03816814720630646,
+      0.013216563500463963,
+      -0.05802750587463379,
+      -0.03293399512767792,
+      0.024950888007879257,
+      0.03806674852967262,
+      0.030365968123078346,
+      -0.006218775641173124,
+      0.025096407160162926,
+      0.01897444948554039,
+      -0.08328551799058914,
+      -0.12255404144525528,
+      -0.1488056480884552,
+      -0.10947883129119873,
+      0.07157187908887863,
+      0.0867432951927185,
+      0.02297169528901577,
+      0.0677298903465271,
+      -0.06475352495908737,
+      0.07431922107934952,
+      0.04768330231308937,
+      -0.010087247006595135,
+      0.04176335409283638,
+      -0.10675273835659027,
+      -0.01648888550698757,
+      -0.08078006654977798,
+      -0.06272873282432556,
+      0.039462845772504807,
+      0.08143012225627899,
+      0.03039928525686264,
+      0.05844346061348915,
+      0.05557023361325264,
+      -0.03211980313062668,
+      -0.04502304270863533,
+      0.06986662745475769,
+      -0.025489429011940956,
+      -0.024074453860521317,
+      0.02641790732741356,
+      0.015760771930217743,
+      0.009165361523628235,
+      -0.019871432334184647,
+      -0.02259266935288906,
+      -0.02599664218723774,
+      -0.0006211787695065141,
+      0.04878360033035278,
+      -0.1518738716840744,
+      0.040855832397937775,
+      -0.030287686735391617,
+      -0.011113406158983707,
+      -0.054677363485097885,
+      -0.08047925680875778,
+      -0.03160131350159645,
+      0.006525852717459202,
+      -0.023627212271094322,
+      -0.04359700530767441,
+      -0.0659923404455185,
+      0.06142200529575348,
+      -0.1733258068561554,
+      -0.07894676923751831,
+      -0.032956838607788086,
+      0.02448776364326477,
+      0.02054336853325367,
+      0.11155017465353012,
+      -0.05936472862958908,
+      0.04473479837179184,
+      0.015171886421740055,
+      0.03465048223733902,
+      -0.01952592469751835,
+      -1.1316538298308895e-33,
+      -0.011801478452980518,
+      -0.027436325326561928,
+      0.0018872568616643548,
+      -0.01021495833992958,
+      -0.0040476578287780285,
+      0.031236764043569565,
+      0.01314384676516056,
+      0.09586190432310104,
+      0.03620098903775215,
+      0.01947413943707943,
+      -0.04922781512141228,
+      0.004217679146677256,
+      -0.05087127909064293,
+      -0.03437204286456108,
+      0.03166317194700241,
+      0.0860852599143982,
+      0.08781758695840836,
+      -0.023091310635209084,
+      -0.08263140916824341,
+      0.020743269473314285,
+      0.09188182651996613,
+      -0.02010398916900158,
+      -0.015583676286041737,
+      -0.018779920414090157,
+      0.06558454781770706,
+      -0.020833352580666542,
+      -0.015407615341246128,
+      -0.06367290765047073,
+      0.06991633772850037,
+      0.0340782068669796,
+      -0.04568251594901085,
+      -0.0012206188403069973,
+      -0.05993827432394028,
+      -0.023799050599336624,
+      0.01292905118316412,
+      0.06354662030935287,
+      -0.08186223357915878,
+      0.010950970463454723,
+      0.08568915724754333,
+      -0.016796408221125603,
+      -0.02048228308558464,
+      0.049648087471723557,
+      0.0436704084277153,
+      0.03381922468543053,
+      0.07117434591054916,
+      -0.0069748349487781525,
+      0.0819058045744896,
+      0.038555342704057693,
+      0.004721800796687603,
+      0.06220734864473343,
+      -0.04708387330174446,
+      -0.025060100480914116,
+      0.030765553936362267,
+      0.0842517763376236,
+      0.08919357508420944,
+      0.11323989927768707,
+      0.020078307017683983,
+      -0.018936561420559883,
+      -0.021944301202893257,
+      -0.003358124988153577,
+      -0.07725462317466736,
+      -0.07175404578447342,
+      -0.0804905891418457,
+      -0.001957499422132969,
+      -0.004147771280258894,
+      0.0675375834107399,
+      0.04920368641614914,
+      0.005113109480589628,
+      0.05306694284081459,
+      0.006911802105605602,
+      0.03547040373086929,
+      -0.005376042798161507,
+      0.09161101281642914,
+      -0.018270961940288544,
+      0.028786106035113335,
+      0.05080399662256241,
+      0.0007507388945668936,
+      0.03972174599766731,
+      -0.04541919380426407,
+      0.0697779729962349,
+      -0.008784426376223564,
+      0.09726712107658386,
+      -0.005612009670585394,
+      -0.03073926456272602,
+      0.14869707822799683,
+      -0.0077696191146969795,
+      0.0774943083524704,
+      -0.10344285517930984,
+      0.04565555974841118,
+      -0.019163789227604866,
+      0.002395767718553543,
+      -0.04297538101673126,
+      0.05303449183702469,
+      0.033623628318309784,
+      -0.056689612567424774,
+      -1.3528596424655738e-33,
+      0.0076592471450567245,
+      0.03579392656683922,
+      -0.009196716360747814,
+      -0.03178710862994194,
+      0.032715216279029846,
+      0.024525033310055733,
+      0.0660012811422348,
+      0.046905267983675,
+      -0.011860799044370651,
+      0.03059081919491291,
+      0.044919926673173904,
+      0.008159870281815529,
+      0.08725785464048386,
+      0.006727301515638828,
+      0.008947215043008327,
+      -0.005505986511707306,
+      -0.02704712562263012,
+      0.06257270276546478,
+      -0.06382603198289871,
+      0.0713466927409172,
+      0.002652938012033701,
+      0.013117562979459763,
+      -0.033422622829675674,
+      -0.010106168687343597,
+      0.056024834513664246,
+      -0.05163870379328728,
+      0.013380243442952633,
+      -0.020367152988910675,
+      -0.04870549589395523,
+      0.015404713340103626,
+      -0.0074284677393734455,
+      0.10180501639842987,
+      -0.03271643817424774,
+      0.01693793572485447,
+      -0.02397642470896244,
+      -0.06682468205690384,
+      0.015095626004040241,
+      -0.0154082290828228,
+      -0.009993430227041245,
+      0.051035862416028976,
+      -0.005700020585209131,
+      -0.01804773323237896,
+      -0.054168857634067535,
+      -0.047091301530599594,
+      -0.053539812564849854,
+      -0.05851346626877785,
+      0.0639081746339798,
+      0.070724718272686,
+      0.016750076785683632,
+      -0.11218593269586563,
+      0.06349195539951324,
+      0.06370110809803009,
+      0.06619032472372055,
+      0.009183467365801334,
+      0.037422165274620056,
+      -0.018686650320887566,
+      -0.030049795284867287,
+      -0.04793068394064903,
+      -0.07329241931438446,
+      -0.01624210737645626,
+      0.03641757741570473,
+      0.07265321910381317,
+      0.10641111433506012,
+      0.007850660011172295,
+      0.06552572548389435,
+      -0.11346554756164551,
+      -0.05091390013694763,
+      0.03878619521856308,
+      -0.02130352333188057,
+      -0.0023561178240925074,
+      0.029210807755589485,
+      0.017208890989422798,
+      0.009226998314261436,
+      0.00697673624381423,
+      -0.01632651872932911,
+      -0.10625991970300674,
+      -0.020881174132227898,
+      -0.005386419128626585,
+      0.01233682967722416,
+      -0.015608811751008034,
+      -0.05849630385637283,
+      0.04413747414946556,
+      0.01494625024497509,
+      -0.017330940812826157,
+      0.08465591818094254,
+      0.0319662019610405,
+      -0.04687732085585594,
+      -0.07815206795930862,
+      0.0363619364798069,
+      -0.056645140051841736,
+      -0.12665581703186035,
+      0.015000889077782631,
+      0.02854318730533123,
+      0.0383964404463768,
+      0.005525792948901653,
+      -3.5466108272430574e-8,
+      -0.01927449181675911,
+      0.00821894221007824,
+      -0.02048521116375923,
+      0.032940398901700974,
+      -0.015376790426671505,
+      -0.07813762128353119,
+      -0.056428711861371994,
+      0.04109025001525879,
+      0.015072069130837917,
+      0.019211256876587868,
+      -0.058510858565568924,
+      -0.06965267658233643,
+      0.02237137034535408,
+      -0.018758052960038185,
+      0.057213783264160156,
+      0.09706041216850281,
+      0.08433598279953003,
+      0.02377929352223873,
+      0.002411212306469679,
+      -0.008548052981495857,
+      0.020686009898781776,
+      0.0016240713885053992,
+      -0.029495956376194954,
+      0.03242703899741173,
+      -0.04020589590072632,
+      0.05678751692175865,
+      -0.02559187263250351,
+      0.008176811039447784,
+      -0.014156710356473923,
+      0.021025054156780243,
+      -0.03285231068730354,
+      -0.06450363993644714,
+      0.046780724078416824,
+      -0.0855557918548584,
+      0.016406917944550514,
+      -0.01104767806828022,
+      0.015883104875683784,
+      0.0077626327984035015,
+      -0.013924562372267246,
+      -0.019907241687178612,
+      -0.02310100942850113,
+      0.033671848475933075,
+      0.03580614551901817,
+      0.02794848382472992,
+      -0.05937680974602699,
+      -0.033783867955207825,
+      0.041545286774635315,
+      0.01850055530667305,
+      0.0187123604118824,
+      0.03890717029571533,
+      0.010464666411280632,
+      -0.04196522757411003,
+      0.011713624000549316,
+      -0.05072787404060364,
+      0.045909635722637177,
+      0.024569587782025337,
+      -0.005212058313190937,
+      -0.026268450543284416,
+      -0.005238429643213749,
+      0.06081865355372429,
+      0.02584083378314972,
+      -0.11727168411016464,
+      0.04761942848563194,
+      0.002285642782226205
+    ],
+    "t1_nwajuaa": [
+      -0.0736963078379631,
+      -0.026395315304398537,
+      -0.008906037546694279,
+      0.0224074125289917,
+      0.0008976865792647004,
+      -0.12359524518251419,
+      0.026114393025636673,
+      0.035618215799331665,
+      -0.1425485908985138,
+      -0.001141260494478047,
+      -0.026180848479270935,
+      -0.06582863628864288,
+      0.10304533690214157,
+      -0.02644997648894787,
+      0.05996210128068924,
+      0.05166604742407799,
+      -0.012757762335240841,
+      -0.07275178283452988,
+      -0.027293996885418892,
+      -0.017215650528669357,
+      0.031344592571258545,
+      0.014188089407980442,
+      -0.08009810745716095,
+      -0.10629257559776306,
+      0.0009992937557399273,
+      0.0414147712290287,
+      0.09840711951255798,
+      -0.030945029109716415,
+      0.010929431766271591,
+      -0.0174786988645792,
+      -0.05727431923151016,
+      -0.008293543010950089,
+      -0.04933210089802742,
+      0.07242629677057266,
+      0.09490735828876495,
+      -0.0014063307316973805,
+      0.02709311991930008,
+      -0.006566702388226986,
+      0.06579042226076126,
+      -0.006508552003651857,
+      -0.015257463790476322,
+      -0.08948146551847458,
+      -0.05331568792462349,
+      -0.04758257791399956,
+      -0.007089011371135712,
+      0.009010476060211658,
+      -0.03490244597196579,
+      -0.07065870612859726,
+      -0.022322066128253937,
+      -0.027636870741844177,
+      -0.0776238888502121,
+      -0.06847581267356873,
+      0.03759956732392311,
+      0.003975618164986372,
+      -0.06103137508034706,
+      0.03719879314303398,
+      0.08238963037729263,
+      0.05590714141726494,
+      -0.037980176508426666,
+      -0.040287721902132034,
+      -0.007890020497143269,
+      0.0031453559640794992,
+      0.01395420078188181,
+      0.018736768513917923,
+      0.01555405929684639,
+      -0.004464596509933472,
+      -0.03850063681602478,
+      0.005601567216217518,
+      0.08703218400478363,
+      -0.09122329205274582,
+      0.003523189341649413,
+      -0.010746659711003304,
+      -0.08571730554103851,
+      0.03240744024515152,
+      0.03749997913837433,
+      -0.06905778497457504,
+      -0.02853512577712536,
+      0.03237138316035271,
+      0.11774712055921555,
+      -0.07337023317813873,
+      -0.001286074984818697,
+      -0.010323486290872097,
+      -0.08026853948831558,
+      0.06674978137016296,
+      -0.0776357427239418,
+      0.013866674154996872,
+      0.001224468694999814,
+      0.07843238860368729,
+      -0.04676971957087517,
+      0.04368859902024269,
+      0.019943077117204666,
+      -0.024618443101644516,
+      0.04919702559709549,
+      0.05812825635075569,
+      0.0076724630780518055,
+      0.029930733144283295,
+      -0.04762634262442589,
+      -0.05203813686966896,
+      0.08441562950611115,
+      0.0034745223820209503,
+      -0.01869533583521843,
+      0.005814671516418457,
+      -0.0810650885105133,
+      -0.03542173653841019,
+      -0.11454908549785614,
+      -0.033711209893226624,
+      0.013354254886507988,
+      0.035213109105825424,
+      0.00864358525723219,
+      -0.010486867278814316,
+      -0.10192975401878357,
+      0.02706727385520935,
+      0.034203410148620605,
+      -0.07033716887235641,
+      0.02641177922487259,
+      -0.002464036690071225,
+      -0.04886796697974205,
+      0.03313210606575012,
+      0.012228387407958508,
+      0.0035450623836368322,
+      0.007649607490748167,
+      0.040345512330532074,
+      -0.057977862656116486,
+      -0.026315227150917053,
+      0.030088813975453377,
+      -0.06445534527301788,
+      -0.01476086676120758,
+      -3.1654332686896586e-33,
+      0.024553801864385605,
+      -0.059446536004543304,
+      -0.05660862848162651,
+      0.08242281526327133,
+      -0.015892304480075836,
+      -0.02800379879772663,
+      -0.03454241529107094,
+      0.05980055034160614,
+      0.001979162683710456,
+      -0.014198661781847477,
+      0.0013775406405329704,
+      0.046367745846509933,
+      -0.09131581336259842,
+      0.0013460417976602912,
+      0.047413282096385956,
+      -0.03737675026059151,
+      0.007416496053338051,
+      -0.005957267712801695,
+      0.07860793173313141,
+      -0.00728688994422555,
+      0.08864659070968628,
+      -0.08053645491600037,
+      0.06732159852981567,
+      0.09884964674711227,
+      0.06288976222276688,
+      0.08252546191215515,
+      -0.03805173188447952,
+      -0.06616123020648956,
+      0.07276765257120132,
+      0.017021970823407173,
+      -0.05261823162436485,
+      -0.007218684069812298,
+      -0.10834787786006927,
+      0.004405891057103872,
+      0.023516591638326645,
+      0.036670394241809845,
+      0.03513203561306,
+      -0.05584663525223732,
+      0.011668025515973568,
+      0.04845593124628067,
+      -0.052988555282354355,
+      0.027484964579343796,
+      0.019305994734168053,
+      -0.07918091118335724,
+      -0.0003925281052943319,
+      0.03196415677666664,
+      0.08409116417169571,
+      -0.037015244364738464,
+      0.05700581148266792,
+      -0.03799014538526535,
+      0.024078037589788437,
+      -0.004776631947606802,
+      0.0798744484782219,
+      0.008380977436900139,
+      0.04697495326399803,
+      -0.024289807304739952,
+      0.003992948681116104,
+      -0.023536305874586105,
+      0.01593746617436409,
+      0.03940679505467415,
+      -0.07206081598997116,
+      0.020020758733153343,
+      -0.007159993518143892,
+      0.04768829047679901,
+      -0.024432554841041565,
+      0.018678149208426476,
+      -0.007578215561807156,
+      0.010000449605286121,
+      0.12834396958351135,
+      -0.0347234345972538,
+      -0.04823983833193779,
+      -0.003024599514901638,
+      0.006112216040492058,
+      -0.022101081907749176,
+      0.018483906984329224,
+      0.020980902016162872,
+      -0.06235511973500252,
+      -0.014114290475845337,
+      -0.002776162466034293,
+      -0.006149780936539173,
+      -0.010191870853304863,
+      0.04203639551997185,
+      -0.02482086978852749,
+      -0.06487608700990677,
+      0.1358632743358612,
+      0.015348716638982296,
+      0.006263502407819033,
+      -0.031499385833740234,
+      -0.02983301877975464,
+      -0.022932883352041245,
+      -0.0752907544374466,
+      -0.023681094869971275,
+      -0.06091948226094246,
+      0.06492096930742264,
+      0.02609272301197052,
+      -1.3583871291438271e-33,
+      -0.01869324967265129,
+      0.05198017135262489,
+      -0.01070169173181057,
+      0.004861264489591122,
+      0.054087281227111816,
+      -0.0001397047599311918,
+      0.01315175462514162,
+      0.04118196666240692,
+      0.0925791934132576,
+      0.035396236926317215,
+      -0.049886032938957214,
+      -0.03688140586018562,
+      0.09920448809862137,
+      -0.009048733860254288,
+      -0.0892287939786911,
+      0.009098583832383156,
+      -0.07757916301488876,
+      -0.019353097304701805,
+      -0.07064879685640335,
+      0.03231583908200264,
+      -0.07660754770040512,
+      0.05689344182610512,
+      -0.13342030346393585,
+      -0.05347616225481033,
+      0.04633503034710884,
+      0.012470363639295101,
+      -0.010639208368957043,
+      0.08096356689929962,
+      0.061307620257139206,
+      0.030175818130373955,
+      0.009021474979817867,
+      0.013844850473105907,
+      0.03558953478932381,
+      -0.03041982464492321,
+      0.004477602895349264,
+      -0.030527401715517044,
+      0.08858872205018997,
+      -0.03391044959425926,
+      0.022699851542711258,
+      0.014115027152001858,
+      0.050252076238393784,
+      -0.026789464056491852,
+      -0.02277507819235325,
+      -0.09053172916173935,
+      -0.00823241751641035,
+      -0.009040452539920807,
+      -0.038775548338890076,
+      0.04331498593091965,
+      -0.04419959709048271,
+      -0.05318447947502136,
+      0.0066588399931788445,
+      0.06491613388061523,
+      0.08286105841398239,
+      -0.10693848133087158,
+      0.011469005607068539,
+      -0.022223440930247307,
+      0.10866794735193253,
+      -0.002903234213590622,
+      -0.031518395990133286,
+      0.01956370659172535,
+      -0.030978305265307426,
+      -0.002070866758003831,
+      0.08707264810800552,
+      -0.005496332421898842,
+      0.010745949111878872,
+      -0.07521689683198929,
+      0.02831495925784111,
+      -0.06544365733861923,
+      -0.09403596073389053,
+      -0.09102235734462738,
+      0.08256330341100693,
+      -0.02303745038807392,
+      0.0011763228103518486,
+      0.033477406948804855,
+      0.048025503754615784,
+      -0.19177573919296265,
+      -0.0391722247004509,
+      -0.022683067247271538,
+      0.033865559846162796,
+      0.03690256178379059,
+      -0.002332775155082345,
+      0.03567728027701378,
+      0.02272539772093296,
+      0.004235704895108938,
+      -0.004962002858519554,
+      0.03598986193537712,
+      -0.009272061288356781,
+      0.014286684803664684,
+      0.050771117210388184,
+      -0.053172532469034195,
+      -0.171688050031662,
+      -0.05444294586777687,
+      0.010377234779298306,
+      0.00459953211247921,
+      -0.036008674651384354,
+      -4.542125253692575e-8,
+      0.00009524139750283211,
+      -0.007727306801825762,
+      0.10743141919374466,
+      0.13183599710464478,
+      0.018808163702487946,
+      0.04528891295194626,
+      -0.09112228453159332,
+      0.039469584822654724,
+      0.019210750237107277,
+      -0.04234929010272026,
+      0.006710810121148825,
+      0.018033849075436592,
+      0.05055873468518257,
+      0.029719192534685135,
+      0.06081877276301384,
+      -0.013802793808281422,
+      0.11668757349252701,
+      -0.057987313717603683,
+      0.010536208748817444,
+      -0.05761867016553879,
+      0.022400762885808945,
+      -0.018863841891288757,
+      -0.03500557690858841,
+      0.03137631714344025,
+      0.03732294589281082,
+      -0.015534717589616776,
+      -0.012003889307379723,
+      -0.027007637545466423,
+      -0.049205850809812546,
+      -0.016331741586327553,
+      -0.04393329098820686,
+      0.02516333945095539,
+      0.07942835986614227,
+      0.03776608407497406,
+      0.015699438750743866,
+      -0.030465563759207726,
+      0.04097503796219826,
+      -0.0105856629088521,
+      -0.03368532657623291,
+      -0.06504562497138977,
+      0.003817302407696843,
+      0.045534055680036545,
+      -0.040433984249830246,
+      0.010753593407571316,
+      0.006009294185787439,
+      0.020056771114468575,
+      -0.07838992029428482,
+      -0.03416061773896217,
+      0.011881331913173199,
+      0.0072017512284219265,
+      -0.006628669798374176,
+      -0.05390011891722679,
+      -0.01811721920967102,
+      0.0742802545428276,
+      0.07552976161241531,
+      0.034723203629255295,
+      0.0010917393956333399,
+      0.01793767884373665,
+      -0.02402741089463234,
+      0.015593546442687511,
+      0.0650462806224823,
+      0.03489115461707115,
+      0.0019091835711151361,
+      -0.05371996760368347
+    ],
+    "t1_nwb3929": [
+      -0.028356708586215973,
+      -0.07509402185678482,
+      0.05932408943772316,
+      0.05156996101140976,
+      0.03233065456151962,
+      -0.0824282318353653,
+      -0.041938140988349915,
+      -0.008276053704321384,
+      -0.039054177701473236,
+      -0.005406263284385204,
+      -0.043085191398859024,
+      -0.06462150812149048,
+      -0.003962390590459108,
+      0.006066764239221811,
+      0.009279155172407627,
+      0.011432790197432041,
+      -0.06243622675538063,
+      -0.0691135823726654,
+      0.004423906095325947,
+      -0.08169027417898178,
+      0.07615388929843903,
+      -0.036561738699674606,
+      -0.057653073221445084,
+      -0.12354052811861038,
+      0.03839874640107155,
+      -0.07663513720035553,
+      0.09242347627878189,
+      -0.008911557495594025,
+      0.0036957887932658195,
+      0.0038091903552412987,
+      -0.005946584977209568,
+      -0.012767638079822063,
+      -0.04121953248977661,
+      0.06944692134857178,
+      -0.008614199236035347,
+      0.03886694833636284,
+      -0.0062674907967448235,
+      -0.0553523413836956,
+      0.05762562155723572,
+      -0.05968222767114639,
+      -0.025000477209687233,
+      -0.03457613289356232,
+      -0.09963556379079819,
+      -0.03462301194667816,
+      -0.045733388513326645,
+      -0.04349134862422943,
+      0.023639585822820663,
+      -0.0993981584906578,
+      0.06091694161295891,
+      0.02244725450873375,
+      -0.07287266850471497,
+      0.003375042462721467,
+      -0.01052048895508051,
+      -0.042271338403224945,
+      -0.02407463639974594,
+      -0.008737331256270409,
+      0.037907250225543976,
+      0.08639541268348694,
+      -0.04816509783267975,
+      -0.040723323822021484,
+      -0.001706747803837061,
+      -0.005055498331785202,
+      0.00705092865973711,
+      0.01112150214612484,
+      -0.029977137222886086,
+      0.007586099207401276,
+      0.004532458260655403,
+      -0.005819232203066349,
+      -0.0025543298106640577,
+      -0.023662501946091652,
+      -0.11088943481445312,
+      -0.06995930522680283,
+      -0.10876460373401642,
+      0.022729866206645966,
+      -0.005619656294584274,
+      0.03759393095970154,
+      0.03351167216897011,
+      0.035719458013772964,
+      0.12473904341459274,
+      -0.1068057268857956,
+      -0.019962776452302933,
+      0.06766840070486069,
+      -0.10398432612419128,
+      0.09044209867715836,
+      -0.07056397944688797,
+      0.005896934308111668,
+      -0.010511616244912148,
+      0.1212802529335022,
+      0.00015018238627817482,
+      0.01900487206876278,
+      0.12171224504709244,
+      -0.06101202964782715,
+      -0.008388842456042767,
+      0.06447445601224899,
+      -0.07129183411598206,
+      -0.02458043396472931,
+      -0.041188471019268036,
+      0.04982205107808113,
+      0.020018158480525017,
+      0.011255255900323391,
+      -0.026313811540603638,
+      0.025992225855588913,
+      -0.017078572884202003,
+      0.017939839512109756,
+      -0.16067935526371002,
+      0.017730016261339188,
+      0.019310463219881058,
+      0.011957382783293724,
+      0.0001251021312782541,
+      -0.060758884996175766,
+      -0.008841343224048615,
+      0.0011283319909125566,
+      -0.01809350587427616,
+      0.032970622181892395,
+      -0.04315442964434624,
+      -0.006247119978070259,
+      -0.18824921548366547,
+      -0.044961411505937576,
+      0.0041303206235170364,
+      0.009711419232189655,
+      0.03555426746606827,
+      0.11109568178653717,
+      -0.10982956737279892,
+      -0.04345010593533516,
+      -0.03702741488814354,
+      -0.025331951677799225,
+      0.03907332196831703,
+      -7.033720254798265e-35,
+      -0.033393096178770065,
+      0.05750740319490433,
+      -0.03176150470972061,
+      0.02310740202665329,
+      0.00508710416033864,
+      -0.02160703018307686,
+      -0.013190741650760174,
+      0.03061557561159134,
+      -0.027808044105768204,
+      0.09958909451961517,
+      0.0013983905082568526,
+      0.03465837612748146,
+      -0.03707289695739746,
+      -0.11411189287900925,
+      0.04265202581882477,
+      -0.02763100527226925,
+      0.022643357515335083,
+      0.03415950760245323,
+      0.1009240671992302,
+      -0.0007553723407909274,
+      0.05857117846608162,
+      -0.08413629978895187,
+      0.0093801598995924,
+      -0.026307309046387672,
+      0.08783676475286484,
+      0.034566834568977356,
+      0.038764577358961105,
+      0.006477187387645245,
+      0.08149036020040512,
+      -0.003030013060197234,
+      0.025422601029276848,
+      0.0024213159922510386,
+      -0.006479905918240547,
+      0.01569872722029686,
+      0.08919309824705124,
+      -0.058641381561756134,
+      0.04773106798529625,
+      0.020572714507579803,
+      -0.0007825212669558823,
+      0.04845598712563515,
+      -0.023901866748929024,
+      0.07890697568655014,
+      0.037424955517053604,
+      0.04212851822376251,
+      0.06873297691345215,
+      -0.008765420876443386,
+      0.04383295774459839,
+      -0.026699654757976532,
+      0.0728033110499382,
+      0.03784320876002312,
+      0.009778279811143875,
+      -0.045505259186029434,
+      0.06092532351613045,
+      0.03283853083848953,
+      0.08521812409162521,
+      0.05741404369473457,
+      0.02860145829617977,
+      -0.053074974566698074,
+      0.03437763825058937,
+      0.013840960338711739,
+      0.007215055171400309,
+      -0.053535230457782745,
+      -0.0009295913623645902,
+      0.01560206525027752,
+      0.014276544563472271,
+      0.0218264851719141,
+      0.014822821132838726,
+      -0.013892889954149723,
+      0.04783233627676964,
+      -0.02391613833606243,
+      -0.05444015935063362,
+      0.0024822333361953497,
+      -0.011365956626832485,
+      -0.012905425392091274,
+      -0.0179904717952013,
+      -0.020505575463175774,
+      0.060962073504924774,
+      0.029299089685082436,
+      -0.03210925683379173,
+      0.06559447199106216,
+      -0.05448228493332863,
+      0.03063192032277584,
+      -0.05738892778754234,
+      -0.030303895473480225,
+      0.1563500612974167,
+      0.06191068887710571,
+      0.03031238541007042,
+      -0.009559444151818752,
+      -0.015311728231608868,
+      0.03837159276008606,
+      -0.018511256203055382,
+      0.0035307961516082287,
+      0.03364758566021919,
+      0.04791387543082237,
+      0.054354120045900345,
+      -1.6105771361562637e-33,
+      -0.02359803207218647,
+      0.008732589893043041,
+      0.009889749810099602,
+      -0.05257803201675415,
+      0.03293125703930855,
+      0.01806936226785183,
+      0.011193713173270226,
+      0.07025577127933502,
+      0.024367284029722214,
+      0.04167434200644493,
+      0.02942540869116783,
+      -0.02191835269331932,
+      0.033873286098241806,
+      0.0390092208981514,
+      -0.0654742494225502,
+      0.04779435321688652,
+      0.01926271803677082,
+      0.04137681424617767,
+      -0.12570779025554657,
+      -0.004963994491845369,
+      0.011845553293824196,
+      0.10224795341491699,
+      -0.0848013237118721,
+      0.0255657397210598,
+      0.07205955684185028,
+      0.009371613152325153,
+      0.04467464238405228,
+      0.07632949203252792,
+      0.041282422840595245,
+      0.012608381919562817,
+      -0.009432136081159115,
+      -0.0391278974711895,
+      -0.061762358993291855,
+      -0.019784901291131973,
+      0.003333542263135314,
+      -0.10933539271354675,
+      0.059528809040784836,
+      -0.025638101622462273,
+      -0.012263872660696507,
+      0.08551321923732758,
+      0.02545326016843319,
+      -0.031076157465577126,
+      -0.07845905423164368,
+      -0.10204395651817322,
+      -0.05610460415482521,
+      0.025925852358341217,
+      0.03195486217737198,
+      -0.014821966178715229,
+      -0.060131777077913284,
+      -0.06610478460788727,
+      0.01738112047314644,
+      0.04391670227050781,
+      0.0017406812403351068,
+      -0.049452975392341614,
+      0.03535423055291176,
+      -0.039502035826444626,
+      0.14987856149673462,
+      -0.02824888937175274,
+      -0.06125950068235397,
+      -0.04607329145073891,
+      0.030370915308594704,
+      0.024500560015439987,
+      0.18525318801403046,
+      -0.02399514615535736,
+      0.053740017116069794,
+      0.015535501763224602,
+      0.07190051674842834,
+      0.017333442345261574,
+      -0.11182593554258347,
+      -0.03206551447510719,
+      -0.01806572638452053,
+      -0.024948081001639366,
+      -0.01175169087946415,
+      -0.018602464348077774,
+      0.0212139580398798,
+      -0.07956347614526749,
+      -0.07260638475418091,
+      -0.049021776765584946,
+      0.02096034400165081,
+      -0.015384819358587265,
+      0.03133733570575714,
+      0.06171838939189911,
+      -0.032029636204242706,
+      0.0006954330601729453,
+      -0.002141736214980483,
+      0.06611993163824081,
+      -0.01428887341171503,
+      0.020674848929047585,
+      0.05106129124760628,
+      -0.03846035897731781,
+      -0.12502242624759674,
+      -0.10074183344841003,
+      0.035902250558137894,
+      0.03166026249527931,
+      0.017599496990442276,
+      -2.8209562685788114e-8,
+      -0.06642354279756546,
+      -0.01307198777794838,
+      0.04611646384000778,
+      0.0024152128025889397,
+      0.060404255986213684,
+      0.048433780670166016,
+      -0.10029537975788116,
+      0.043040212243795395,
+      0.060347605496644974,
+      -0.07775396853685379,
+      -0.020692626014351845,
+      0.004493700806051493,
+      -0.00021790617029182613,
+      0.023328814655542374,
+      0.043217677623033524,
+      0.004769023973494768,
+      0.033438511192798615,
+      0.0042269350960850716,
+      0.02464226819574833,
+      -0.06216077506542206,
+      0.03828234225511551,
+      -0.012392116710543633,
+      -0.01707928441464901,
+      0.01395362801849842,
+      0.014499053359031677,
+      -0.05176207795739174,
+      0.007105825934559107,
+      0.014676644466817379,
+      -0.025967810302972794,
+      -0.10069943964481354,
+      -0.0273978840559721,
+      -0.017393970862030983,
+      0.03224340081214905,
+      -0.03512265905737877,
+      0.034459855407476425,
+      -0.044570885598659515,
+      0.05326344817876816,
+      0.006953229196369648,
+      -0.036296624690294266,
+      -0.019270649179816246,
+      0.011327223852276802,
+      0.06817354261875153,
+      -0.011463182978332043,
+      0.01255699060857296,
+      -0.04593146592378616,
+      0.018053779378533363,
+      -0.004331453237682581,
+      0.03314099833369255,
+      0.022949496284127235,
+      0.0229699295014143,
+      0.01632147841155529,
+      -0.03393671661615372,
+      -0.058173175901174545,
+      0.03629140555858612,
+      -0.03246534988284111,
+      -0.04780234023928642,
+      -0.002576369559392333,
+      -0.0024875837843865156,
+      -0.09516424685716629,
+      0.018229208886623383,
+      0.034128185361623764,
+      -0.01943451166152954,
+      0.0033832357730716467,
+      -0.026803888380527496
+    ]
+  },
+  "texts": {
+    "t3_1pxf12w": "Will I end up getting any job? I am currently working as data engineer, and my org uses SAS for ETL and Oracle for warehouse.\n\nFor personal reasons I am about to quit the job and I want to transition into DBT, Snowflake. How do I get shortlisted for these roles? Will I ever get a job?\n\nLooking for job in Europe. I have valid visa to work as well.",
+    "t1_nwajuaa": "Are you interested in transitioning into Data Engineering? Read our community guide: https://dataengineering.wiki/FAQ/How+can+I+transition+into+Data+Engineering\n\n*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](/message/compose/?to=/r/dataengineering) if you have any questions or concerns.*",
+    "t1_nwb3929": "I don't know how but if if we keep trying u will, took me 1.5 years to switch from SAP administration to land a job as data Engineer at 5 years. Hope u will also."
+  }
+}
