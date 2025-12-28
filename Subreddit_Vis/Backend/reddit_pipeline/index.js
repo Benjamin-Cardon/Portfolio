@@ -1,5 +1,4 @@
 import Parser from "./io/Parser.js"
-import RedditAPIManager from './api/RedditAPIManager.js'
 import Logger from './io/Logger.js'
 import Writer from './io/Writer.js'
 import process from 'node:process'

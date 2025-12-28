@@ -5,8 +5,8 @@ import { nlp, its, as, sentiment, embeddings } from '../init/init.js'
 export default class MetricAnalyzer {
   constructor(logger) {
     this.data = {
-      comments: {},
       posts: {},
+      comments: {},
       words: {},
       users: {},
       embeddings: {},
@@ -21,6 +21,7 @@ export default class MetricAnalyzer {
         i++;
         if (i % 50 === 0) {
           this.logger.log('info', `Calculated Metrics for ${i} posts and associated comments.`);
+          this.logger.log('debug', `Calculated Metrics for ${i} posts and associated comments.`);
         }
         const post_metrics = await this.calculate_post_metrics(post);
         const comments_metrics = await this.calculate_comments_metrics(post.comments, post.data.name);
@@ -189,7 +190,9 @@ export default class MetricAnalyzer {
             global_word = words[word[0]];
             global_word.frequency += this_word.frequency;
             global_word.unique_texts++;
-            global_word.users.push(comment.author_id);
+            if (!global_word.users.includes(comment.author_id)) {
+              global_word.users.push(comment.author_id);
+            }
             global_word.texts.push(comment.id);
           }
           switch (comment.sentiment.label) {
@@ -296,7 +299,9 @@ export default class MetricAnalyzer {
           global_word = words[word[0]];
           global_word.frequency += this_word.frequency;
           global_word.unique_texts++;
-          global_word.users.push(post_metrics.author_id);
+          if (!global_word.users.includes(post_metrics.author_id)) {
+            global_word.users.push(post_metrics.author_id);
+          }
           global_word.texts.push(post_metrics.id);
         }
         switch (post_metrics.sentiment.label) {

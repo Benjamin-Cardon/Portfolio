@@ -55,7 +55,7 @@ export default class Parser {
     const [mode, hasModeArg] = this.getFlag(argv, '--mode=', null)
     const [subreddit, hasSubredditArg] = this.getFlag(argv, '--subreddit=', null)
     const [count, hasCountArg] = this.getFlag(argv, '--count=', null)
-    const [out, hasOutNameArg] = this.getFlag(argv, '--out=', `${subreddit}_data`)
+    const [out, hasOutNameArg] = this.getFlag(argv, '--out=', `${subreddit}_data.json`)
     const [burst_mode, hasBurstModeArg] = this.getFlag(argv, '--burst_mode=', 'end')
 
     let rawArgs = { mode, hasModeArg, subreddit, hasSubredditArg, count, hasCountArg, out, hasOutNameArg, burst_mode, hasBurstModeArg }
@@ -308,6 +308,7 @@ export default class Parser {
       }
     }
     if (isFull) {
+      count = Infinity
       burst_mode = 'sleep'
       if (rawArgs.hasBurstModeArg) {
         errors.push({

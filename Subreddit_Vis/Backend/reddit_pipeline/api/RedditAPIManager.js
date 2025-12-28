@@ -359,13 +359,8 @@ export default class RedditAPIManager {
       }
 
       this.get_request_rates()
-      while (more_nodes_request_queue.length && !this.end_requests) {
+      while (more_nodes_request_queue.length && !this.check_end()) {
         await this.sleep_until_refresh_if_appropriate();
-        // if (this.check_end()) {
-        //   break;
-        // }
-        // We need to see if this will break on calculate- are the more nodes already stored a place they'll be propogated to?
-        // This is probably a case we've not dealt with yet.
         this.increment_requests();
         this.logger.log(
           'debug',
