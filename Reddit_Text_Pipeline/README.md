@@ -33,7 +33,7 @@ Unlike platforms like Facebook, Instagram, LinkedIn, or TikTok, Reddit is made u
 Examples:
 - `r/tractors` → These individuals discuss the specific pros and cons of different tractor brands and models
 - `r/gamingnews` → Members of this community both spend money on games, and vocally (often offensively) discuss their opinions on the state of the industry.
-- `r/taylorswift` → A psychological goldmine for anyone interested in selling products to women in the US aged 30-50.
+- `r/taylorswift` → A great source of insight for anyone interested in selling products to women in the US aged 30-50.
 - `r/aquaculture` → industry-adjacent practitioners (fish farming)
 
 ---
