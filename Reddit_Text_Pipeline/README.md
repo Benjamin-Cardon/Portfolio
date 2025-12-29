@@ -59,7 +59,7 @@ When a task succeeds, the JSON includes these top-level objects:
 }
 ```
 
-Each top level object is like an indexed "Table". Each member of these objects is like a "Row," reflecting a single instance of it's parent. ie: posts contains many post objects. The keys of each member are their Reddit fullnames. A fullname is a reddit unique identifier, which includes a prefix which tells us an objects type.  
+Each top level object is like an indexed "Table". Each member of these objects is like a "Row," reflecting a single instance of it's parent. ie: posts contains many post objects. The keys of each member are their Reddit fullnames. A fullname is a reddit unique identifier, which includes a prefix which tells us an objects type.
 
 The dataset includes:
 
@@ -112,7 +112,7 @@ Two short asides on the models:
 
 Unfortunately, bigger is sometimes better. Although I found these models to have satisfactory outputs, using a more powerful but compute heavy set of models would actually significantly improve analytical performance.
 
-As of now, the code is written to expect the particular outputs of these models. Easily switching models is not currently possible. However, configurable model types are included in my roadmap as an aspirational goal. 
+As of now, the code is written to expect the particular outputs of these models. Easily switching models is not currently possible. However, configurable model types are included in my roadmap as an aspirational goal.
 
 **Setup Docs**
 - Reddit Auth Setup: `docs/<SETUP_GUIDE_REDDIT>` for step-by-step setup and model placement.`
@@ -136,18 +136,18 @@ node index.js --subreddit=dataengineering --mode=full
 **Count mode**
 For large, active, and old subreddits, full mode would get a massive amount of data, and take literally days.
 
-In these cases, count mode is more appropriate. 
+In these cases, count mode is more appropriate.
 
 ```bash
 node index.js --subreddit=woodworking --mode=count --count=2000
 ```
 
-note: This is still a substantial job. Each post can have hundreds or thousands of comments, so two thousand posts may involve several hundred thousand texts. 
+note: This is still a substantial job. Each post can have hundreds or thousands of comments, so two thousand posts may involve several hundred thousand texts.
 
 
 ### Batch mode (run many tasks)
 
-In batch mode, the tool reads a comma-separated file where each line describes a single task. 
+In batch mode, the tool reads a comma-separated file where each line describes a single task.
 
 For a batch process, a file is produced for each task. If a task fails, an error log is produced and written instead of the data. At the end of a batch, an additional batch manifest is written to the directory, with basic information about each task run in the batch.
 
@@ -167,7 +167,7 @@ This file might look like this. It does not need a .csv ending to be read.
 
 `--out_dir` determines which directory the files will be written to. If it does not exist, it will be created. Files are produced with overwrite. `--out` determines the name of a specific file. `--out_dir`,`--log_level`, and `--out` can be used as optional arguments on single tasks. In batch mode tasks, however, `--out_dir` and `log_level` values are overridden by the values called from the terminal.
 
-`--log_level` can be called with three valid inputs, which are info, debug, and quiet. info is the default. 
+`--log_level` can be called with three valid inputs, which are info, debug, and quiet. info is the default.
 
 **Code Docs:**
 - CLI: `docs/02_Command_Line_Reference`
@@ -193,15 +193,15 @@ Runtime depends primarily on:
 Rule of thumb for timescales:
 - small/medium subreddits: `r/ToyataSienna` --> Instant to “grab a coffee”
 - medium/large subreddits + batches: `r/SabrinaCarpenter`--> may take hours
-- large subreddits + batches: `r/HomeImprovement` --> can become overnight/multi-day 
+- large subreddits + batches: `r/HomeImprovement` --> can become overnight/multi-day
 - very large subreddits: `r/politics`--> infeasible, weeks, would probably crash
 
 ---
 
 ## Roadmap
 
-- **0.1 Add-ons:** unit tests, batch scripting helpers, TypeScript types  
-- **1)** Visualization + clustering + cross-feature correlation + report generation  
-- **2)** HTTPS API endpoint to serve the engine’s capabilities  
-- **3)** Cloud-hosted UI to request reports/data  
-- **4)** Cloud-hosted interactive visualization tool for EDA  
+- **0.1 Add-ons:** unit tests, batch scripting helpers, TypeScript types
+- **1)** Visualization + clustering + cross-feature correlation + report generation
+- **2)** HTTPS API endpoint to serve the engine’s capabilities
+- **3)** Cloud-hosted UI to request reports/data
+- **4)** Cloud-hosted interactive visualization tool for EDA
