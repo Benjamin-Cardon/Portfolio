@@ -1,9 +1,10 @@
-import Parser from "./io/Parser.js"
-import Logger from './io/Logger.js'
-import Writer from './io/Writer.js'
+import Parser from "./batch/io/Parser.js"
+import Logger from './batch/io/Logger.js'
+import Writer from './batch/io/Writer.js'
+import Runner from './batch/orchestration/Runner.js'
+import TokenManager from './batch/auth/TokenManager.js'
 import process from 'node:process'
-import Runner from './analysis/Runner.js'
-import TokenManager from './api/TokenManager.js'
+
 
 async function main() {
   const parser = new Parser()

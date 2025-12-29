@@ -79,12 +79,12 @@ export default class TokenManager {
 
   get_cached_auth_token() {
     try {
-      if (!existsSync("./api/token.txt")) {
+      if (!existsSync("./batch/auth/token.txt")) {
         this.logger.log('debug', 'No token.txt found; treating as no cached token');
         return
       }
 
-      const contents = readFileSync("./api/token.txt", "utf-8");
+      const contents = readFileSync("./batch/auth/token.txt", "utf-8");
       const [expStr, token] = contents.split(":::");
       const expiration = Number(expStr);
 

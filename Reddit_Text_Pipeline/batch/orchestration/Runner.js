@@ -1,5 +1,5 @@
-import MetricAnalyzer from './MetricAnalyzer.js'
-import RedditAPIManager from '../api/RedditAPIManager.js'
+import MetricAnalyzer from '../../task/analysis/MetricAnalyzer.js'
+import RedditAPIManager from '../../task/api/RedditAPIManager.js'
 import path from 'path'
 export default class Runner {
   constructor(Logger, Writer, TokenManager, batch_config) {

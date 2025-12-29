@@ -1,2 +1,0 @@
-node .\index.js --subreddit=datascience --mode=full
-node .\index.js --subreddit=gamingnews --mode=count --count=1300 --burst_mode=end

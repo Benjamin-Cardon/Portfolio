@@ -1,0 +1,5 @@
+--subreddit=music --mode=count --count=200 --out=music_200.json,
+--subreddit=taylorswift --mode=count --count=200 --out=eras_200.json,
+--subreddit=sabrinacarpenter --mode=full --out=fullshortnsweet.json,
+--subreddit=depechemode --mode=full,
+--subreddit=Mozart --mode=count --count=1000 --out=salieristears.json,

@@ -1,5 +1,6 @@
+/Subreddit_Vis/
 node_modules/
-*.env
+Subreddit_Vis/backend/.env
 /Subreddit_Vis/Backend/reddit_pipeline/auth/token.txt
 /Subreddit_Vis/Backend/models
 *token.txt
