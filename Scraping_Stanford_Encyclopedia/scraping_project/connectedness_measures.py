@@ -6,10 +6,10 @@ AUTH = ("neo4j", "foucault")
 
 neo = GraphDatabase.driver(URI, auth=AUTH )
 query = "MATCH (a:Article) return a"
-
+DATABASE= "portfoliodev"
 
 def connectedness_measures():
-  with neo.session(database="neo4j") as session:
+  with neo.session(database=DATABASE) as session:
     query = "MATCH (a:Article) return a"
     result = session.run(query)
     raw_names = result.data()

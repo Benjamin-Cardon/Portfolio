@@ -12,7 +12,7 @@ scrapy.utils.reactor.install_reactor('twisted.internet.asyncioreactor.AsyncioSel
 from twisted.internet import reactor
 URI = "neo4j://localhost:7687"
 AUTH = ("neo4j", "foucault")
-
+DATABASE = "portfoliodev"
 
 class MainSpider(scrapy.Spider):
     name = "main"
@@ -83,7 +83,7 @@ class CleanupMainSpider(scrapy.Spider):
     def start_requests(self):
         cypher_query = "MATCH (a:Article {title: 'Not Yet Filled'}) RETURN a"
         urls = []
-        with self.neo.session(database="neo4j") as session:
+        with self.neo.session(database=DATABASE) as session:
             result = session.run(cypher_query)
             node_data = result.data()
             print(node_data)
@@ -99,7 +99,7 @@ class CleanupMainSpider(scrapy.Spider):
         url = response.url
         title = response.xpath("//body/div[@id='container']/div[@id='content']/div[@id='article']/div[@id='article-content']/div[@id='aueditable']/h1/text()").get()
         if title is not None:
-            with self.neo.session(database="neo4j") as session:
+            with self.neo.session(database=DATABASE) as session:
                     query = "MATCH (a:Article { url: 'XXX' }) \n SET a.title = 'YYY' \n RETURN a".replace('XXX', url).replace('YYY', title)
                     result = session.run(query=query)
         related_entries_html = response.xpath("//body/div[@id='container']/div[@id='content']/div[@id='article']/div[@id='article-content']/div[@id='aueditable']/div[@id='related-entries']/p").get()
@@ -113,14 +113,14 @@ class CleanupMainSpider(scrapy.Spider):
                     related_url = "https://plato.stanford.edu/entries/" + related_entry_ref[3:]
                 else:
                     related_url = "Non-standard Reference URL"
-                with self.neo.session(database="neo4j") as session:
+                with self.neo.session(database=DATABASE) as session:
                     query = "MATCH (a:Article { title: 'XXX', url: 'ZZZ' }), (b:Article {url:'YYY'}) \n MERGE (a)-[r:RELATED_TO]->(b) \n RETURN a, b, r".replace('XXX', title).replace('YYY', related_url).replace('ZZZ', url)
                     result = session.run(query=query)
 
 
 def cleanupOutliers():
     neo = GraphDatabase.driver(URI, auth=AUTH )
-    with neo.session(database="neo4j") as session:
+    with neo.session(database=DATABASE) as session:
         query = "MATCH (a:Article {title:'Not Yet Filled'}) \n DELETE a"
         result = session.run(query=query)
     neo.close()

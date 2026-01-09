@@ -5,6 +5,7 @@ from neo4j import GraphDatabase, RoutingControl
 
 URI = "neo4j://localhost:7687"
 AUTH = ("neo4j", "foucault")
+DATABASE = 'porfoliodev'
 
 class ScrapingProjectPipeline:
     def process_item(self, item, spider):
@@ -27,12 +28,12 @@ class ArticleToNeoPipeline:
     def process_item(self, item, spider):
         if self.urls.get(item['url']) is None:
             self.urls[item['url']] = item['title']
-            with self.neo.session(database="neo4j") as session:
+            with self.neo.session(database=DATABASE) as session:
                 query = 'MERGE (a:Article  { title: \'XXX\', url: \'YYY\'  }) \nRETURN a'.replace('XXX', item['title']).replace('YYY', item['url'])
                 session.run(query=query)
         elif self.urls.get(item['url']) == "Not Yet Filled":
             self.urls[item['url']] = item['title']
-            with self.neo.session(database="neo4j") as session:
+            with self.neo.session(database=DATABASE) as session:
                 query = 'MATCH (a:Article  { title: \'XXX\', url: \'YYY\'  }) \n SET a.title = "ZZZ" \n RETURN a'.replace('XXX', "Not Yet Filled").replace('YYY', item['url']).replace('ZZZ',item['title'])
                 session.run(query=query)
 
@@ -55,10 +56,10 @@ class ArticleToNeoPipeline:
 
                 if self.urls.get(url) is None:
                     self.urls[url] = "Not Yet Filled"
-                    with self.neo.session(database="neo4j") as session:
+                    with self.neo.session(database=DATABASE) as session:
                         query = 'MERGE (a:Article  { title: \'Not Yet Filled\', url: \'YYY\'  }) \nRETURN a'.replace('YYY', url)
                         result = session.run(query=query)
-                with self.neo.session(database="neo4j") as session:
+                with self.neo.session(database=DATABASE) as session:
                     query = "MATCH (a:Article { title: 'XXX', url: 'ZZZ' }), (b:Article {url:'YYY'}) \n MERGE (a)-[r:RELATED_TO]->(b) \n RETURN a, b, r".replace('XXX', item['title']).replace('YYY', url).replace('ZZZ', item['url'])
                     result = session.run(query=query)
         return item
