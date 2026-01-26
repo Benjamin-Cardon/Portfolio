@@ -12,6 +12,7 @@ scrapy.utils.reactor.install_reactor('twisted.internet.asyncioreactor.AsyncioSel
 from twisted.internet import reactor
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
 URI=os.getenv('URI')
 AUTH_USER=os.getenv('AUTH_USER')
