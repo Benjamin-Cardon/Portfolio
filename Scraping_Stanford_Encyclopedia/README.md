@@ -64,7 +64,7 @@ connectedness_measures
 
 ```python connectedness_measures.py```
 
-## Nerd Stuff: Why This Project, Data Model, Pipeline
+## Nerd Stuff: Why This Project, Data Model
 ### Why this Project?
 #### What is the Stanford Encyclopedia of Philosophy?
 The Stanford Encyclopedia of Philosophy (SEP) is a highly curated, free, online encyclopedia on philsophy and philosophical topics.
