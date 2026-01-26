@@ -29,15 +29,13 @@ AUTH_USER=neo4j
 AUTH_PASSWORD=<your-password>
 DATABASE=neo4j
 ```
-
-### 1 Create `.env`
 python -m venv .venv
-# Windows:
 
+#### Windows:
 ```.venv\Scripts\activate```
 
-# macOS/Linux:
-# source .venv/bin/activate
+#### macOS/Linux:
+```source .venv/bin/activate```
 
 ### 2 Install dependencies
 pip install scrapy neo4j python-dotenv beautifulsoup4 twisted
