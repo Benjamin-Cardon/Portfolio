@@ -1,12 +1,15 @@
 from neo4j import GraphDatabase
 from queue import Queue
-
-URI = "neo4j://localhost:7687"
-AUTH = ("neo4j", "foucault")
-
+from dotenv import load_dotenv
+import os
+load_dotenv()
+URI=os.getenv('URI')
+AUTH_USER=os.getenv('AUTH_USER')
+AUTH_PASSWORD=os.getenv('AUTH_PASSWORD')
+DATABASE=os.getenv('DATABASE')
+AUTH = (AUTH_USER, AUTH_PASSWORD)
 neo = GraphDatabase.driver(URI, auth=AUTH )
 query = "MATCH (a:Article) return a"
-DATABASE= "portfoliodev"
 
 def connectedness_measures():
   with neo.session(database=DATABASE) as session:

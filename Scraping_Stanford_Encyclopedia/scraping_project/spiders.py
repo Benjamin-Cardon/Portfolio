@@ -10,9 +10,14 @@ import asyncio
 from twisted.internet import asyncioreactor
 scrapy.utils.reactor.install_reactor('twisted.internet.asyncioreactor.AsyncioSelectorReactor')
 from twisted.internet import reactor
-URI = "neo4j://localhost:7687"
-AUTH = ("neo4j", "foucault")
-DATABASE = "portfoliodev"
+from dotenv import load_dotenv
+import os
+load_dotenv()
+URI=os.getenv('URI')
+AUTH_USER=os.getenv('AUTH_USER')
+AUTH_PASSWORD=os.getenv('AUTH_PASSWORD')
+DATABASE=os.getenv('DATABASE')
+AUTH = (AUTH_USER, AUTH_PASSWORD)
 
 class MainSpider(scrapy.Spider):
     name = "main"
